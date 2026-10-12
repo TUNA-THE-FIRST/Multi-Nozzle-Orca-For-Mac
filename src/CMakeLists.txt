@@ -422,7 +422,7 @@ else ()
             # Xcode's CodeSign phase fails on the bundled Python runtime's dotted
             # dirs (python3.12) under Contents/MacOS. Skip it for local dev builds
             # and let the linker ad-hoc sign; the shipped bundle is signed by the
-            # Ninja/CI packaging path (build_release_macos.sh, build_orca.yml).
+            # Ninja/CI packaging path (build_release_macos.sh, scripts/package_macos.sh).
             set_target_properties(Snapmaker_Orca PROPERTIES XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO)
         endif()
         # Create symlink for macOS bundle Resources directory
