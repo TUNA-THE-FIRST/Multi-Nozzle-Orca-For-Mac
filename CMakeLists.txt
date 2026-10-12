@@ -139,8 +139,9 @@ if(SLIC3R_ASAN)
 endif()
 
 # Sentry crash reporting - on by default everywhere except the Flatpak build
-# (Flathub distribution stays telemetry-free).
-if (WIN32 OR APPLE OR (UNIX AND NOT FLATPAK))
+# (Flathub distribution stays telemetry-free) and Snapmaker Orca Mac, whose crashes
+# and logs are not Snapmaker's to receive: macOS keeps its own crash reports instead.
+if (WIN32 OR (UNIX AND NOT APPLE AND NOT FLATPAK))
     set(SLIC3R_SENTRY_DEFAULT ON)
 else()
     set(SLIC3R_SENTRY_DEFAULT OFF)
@@ -307,7 +308,7 @@ if (APPLE)
     if (CMAKE_MACOSX_BUNDLE)
         set(CMAKE_INSTALL_RPATH @executable_path/../Frameworks)
     endif()
-    SET(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.snapmaker.snapmaker-orca")
+    SET(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${SLIC3R_MAC_BUNDLE_ID}")
 
     # The macOS CI jobs build with Ninja (build_release_macos.sh -x), so the Xcode generator
     # is not covered. Xcode adds -Wshorten-64-to-32 by default ("Implicit Conversion to 32 Bit

@@ -19,6 +19,8 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
+#include "libslic3r_version.h"
+
 #ifdef __linux__
 static std::string get_linux_config_dir()
 {
@@ -106,7 +108,7 @@ namespace common
 #elif __APPLE__
         const char* home_env = getenv("HOME");
         versionFilePath      = home_env;
-        versionFilePath      = versionFilePath + "/Library/Application Support/Snapmaker_Orca/system/Snapmaker.json";
+        versionFilePath      = versionFilePath + "/Library/Application Support/" SLIC3R_DATA_DIR_NAME "/system/Snapmaker.json";
 #else
         std::string config_dir = get_linux_config_dir();
         if (!config_dir.empty())
@@ -146,7 +148,7 @@ namespace common
 #elif __APPLE__
             const char* home_env = getenv("HOME");
             versionFilePath      = home_env;
-            versionFilePath      = versionFilePath + "/Library/Application Support/Snapmaker_Orca/web/flutter_web/version.json";
+            versionFilePath      = versionFilePath + "/Library/Application Support/" SLIC3R_DATA_DIR_NAME "/web/flutter_web/version.json";
 #else
             std::string config_dir = get_linux_config_dir();
             if (!config_dir.empty())
@@ -194,7 +196,7 @@ namespace common
 #elif __APPLE__
         const char* home_env = getenv("HOME");
         versionFilePath      = home_env;
-        cfgfile              = versionFilePath + "/Library/Application Support/Snapmaker_Orca/Snapmaker_Orca.conf";
+        cfgfile              = versionFilePath + "/Library/Application Support/" SLIC3R_DATA_DIR_NAME "/" SLIC3R_APP_KEY ".conf";
 #else
         std::string config_dir = get_linux_config_dir();
         if (!config_dir.empty())
@@ -238,7 +240,7 @@ namespace common
 #elif __APPLE__
         const char* home_env = getenv("HOME");
         versionFilePath      = home_env;
-        cfgfile              = versionFilePath + "/Library/Application Support/Snapmaker_Orca/Snapmaker_Orca.conf";
+        cfgfile              = versionFilePath + "/Library/Application Support/" SLIC3R_DATA_DIR_NAME "/" SLIC3R_APP_KEY ".conf";
 #else
         std::string config_dir = get_linux_config_dir();
         if (!config_dir.empty())

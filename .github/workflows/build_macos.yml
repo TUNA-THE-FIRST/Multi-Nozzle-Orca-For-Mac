@@ -1,0 +1,254 @@
+name: Build macOS
+
+# Snapmaker Orca Mac: builds the Apple Silicon app, runs the unit tests, slices through every
+# shipped printer profile and packs a DMG to download from the run's summary page.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      rebuild-deps:
+        description: 'Rebuild the dependencies even when a cached build exists'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Every job runs on macos-26: Apple Silicon with Xcode 26 (the macOS 14 image retires on 2026-11-02).
+env:
+  DEPS_DIR: deps/build/arm64/OrcaSlicer_dep
+
+jobs:
+  deps:
+    name: Dependencies
+    runs-on: macos-26
+    outputs:
+      cache-key: ${{ steps.key.outputs.key }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: 'false'
+
+      # The cache holds a toolchain's build of deps/: a new Xcode or a changed recipe builds afresh.
+      - name: Cache key
+        id: key
+        run: |
+          xcode=$(xcodebuild -version | head -1 | tr ' ' '-')
+          echo "key=macos-arm64-${xcode}-deps-${{ hashFiles('deps/**') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore dependencies
+        id: restore
+        if: ${{ !inputs.rebuild-deps }}
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          key: ${{ steps.key.outputs.key }}
+          lookup-only: true
+
+      - uses: lukka/get-cmake@latest
+        if: ${{ inputs.rebuild-deps || steps.restore.outputs.cache-hit != 'true' }}
+        with:
+          cmakeVersion: "~4.3.0"
+
+      - name: Build dependencies
+        if: ${{ inputs.rebuild-deps || steps.restore.outputs.cache-hit != 'true' }}
+        run: |
+          brew install automake texinfo libtool pkgconf yasm nasm
+          ./build_release_macos.sh -d -x -j 3 -a arm64
+          # Keep only the installed prefix; the build trees are not needed and are large.
+          (cd deps/build/arm64 && find . -mindepth 1 -maxdepth 1 ! -name 'OrcaSlicer_dep' -exec rm -rf {} +)
+
+      - name: Save dependencies
+        if: ${{ inputs.rebuild-deps || steps.restore.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          key: ${{ steps.key.outputs.key }}
+
+  build:
+    name: App, DMG
+    needs: deps
+    runs-on: macos-26
+    timeout-minutes: 300
+    outputs:
+      dmg-name: ${{ steps.version.outputs.dmg-name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: 'true'
+
+      - name: Restore dependencies
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          key: ${{ needs.deps.outputs.cache-key }}
+          fail-on-cache-miss: true
+
+      - uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~4.3.0"
+
+      - name: Version
+        id: version
+        run: |
+          ver=$(sed -n 's/^set(Snapmaker_VERSION "\(.*\)")$/\1/p' version.inc)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            label="PR${{ github.event.number }}"
+          else
+            label="V${ver}-$(git rev-parse --short HEAD)"
+          fi
+          echo "dmg-name=Snapmaker_Orca_Mac_arm64_${label}" >> "$GITHUB_OUTPUT"
+
+      # Compiler cache: pushes to main keep it warm, pull requests reuse it.
+      - name: Compiler cache
+        id: ccache
+        continue-on-error: true
+        uses: hendrikmuhs/ccache-action@v1.2.24
+        with:
+          key: macos-arm64
+          max-size: 3G
+          restore: false
+          save: false
+          job-summary: ''
+      - name: Restore compiler cache
+        if: ${{ steps.ccache.outcome == 'success' }}
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-macos-arm64-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ccache-macos-arm64-
+      - name: Enable compiler cache
+        if: ${{ steps.ccache.outcome == 'success' }}
+        run: |
+          {
+            echo "CMAKE_C_COMPILER_LAUNCHER=ccache"
+            echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache"
+            echo "CCACHE_SLOPPINESS=pch_defines,time_macros,include_file_mtime,include_file_ctime"
+            echo "CCACHE_DEPEND=1"
+          } >> "$GITHUB_ENV"
+          ccache -z
+
+      - name: Free disk space
+        run: |
+          df -h /
+          # Keep the selected Xcode; the other ones on the image are several GB each.
+          current=$(xcode-select -p | sed 's|/Contents/Developer||')
+          current=$(cd "$current" && pwd -P)
+          for x in /Applications/Xcode*.app; do
+            [ "$(cd "$x" && pwd -P)" = "$current" ] || sudo rm -rf "$x"
+          done
+          sudo rm -rf ~/Library/Developer/CoreSimulator/Caches/*
+          df -h /
+
+      # -T builds the unit tests too; ORCA_TESTS_BUILD_ONLY leaves running them to the tests job.
+      - name: Build the app
+        env:
+          ORCA_TESTS_BUILD_ONLY: '1'
+        run: |
+          brew install libtool
+          ./build_release_macos.sh -s -n -x -j 3 -a arm64 -T
+
+      - name: Compiler cache statistics
+        if: ${{ always() && steps.ccache.outcome == 'success' }}
+        run: ccache -s
+      - name: Save compiler cache
+        if: ${{ always() && steps.ccache.outcome == 'success' && github.event_name != 'pull_request' }}
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-macos-arm64-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # The preset caches go into the bundle before it is signed: changing it afterwards breaks the seal.
+      - name: Preset caches
+        run: ./scripts/build_preset_cache.sh -b build/arm64 "build/arm64/Snapmaker_Orca/Snapmaker Orca Mac.app/Contents/Resources/profiles"
+
+      - name: Sign and pack the DMG
+        run: ./scripts/package_macos.sh "build/arm64/Snapmaker_Orca/Snapmaker Orca Mac.app" "${{ steps.version.outputs.dmg-name }}.dmg"
+
+      - name: Upload the DMG
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.version.outputs.dmg-name }}
+          path: ${{ steps.version.outputs.dmg-name }}.dmg
+          if-no-files-found: error
+
+      - name: Pack the tests and the profile validator
+        run: |
+          tar -cf build_tests.tar build/arm64/tests
+          tar -cf validator.tar -C build/arm64/Snapmaker_Orca Snapmaker_Orca_profile_validator.app
+
+      - name: Upload the tests
+        uses: actions/upload-artifact@v7
+        with:
+          name: tests-${{ github.sha }}
+          path: build_tests.tar
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Upload the profile validator
+        uses: actions/upload-artifact@v7
+        with:
+          name: validator-${{ github.sha }}
+          path: validator.tar
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Upload debug symbols
+        uses: actions/upload-artifact@v7
+        with:
+          name: dSYM-${{ steps.version.outputs.dmg-name }}
+          path: build/arm64/Snapmaker_Orca/dSYM
+          retention-days: 30
+          if-no-files-found: warn
+
+  tests:
+    name: Unit tests
+    needs: build
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~4.3.0"
+      - uses: actions/download-artifact@v8
+        with:
+          name: tests-${{ github.sha }}
+      - name: Run the unit tests
+        timeout-minutes: 30
+        run: |
+          tar -xf build_tests.tar
+          scripts/run_unit_tests.sh build/arm64/tests Release
+      - name: Upload the test logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-logs-${{ github.sha }}
+          path: build/arm64/tests/**/*.log
+
+  slice_check:
+    name: Profile slice check
+    needs: build
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: validator-${{ github.sha }}
+      # Loads every system profile, then slices a two-colour cube through every printer so every
+      # custom G-code template shipped is expanded.
+      - name: Validate and slice every profile
+        timeout-minutes: 60
+        run: |
+          tar -xf validator.tar
+          validator=Snapmaker_Orca_profile_validator.app/Contents/MacOS/Snapmaker_Orca_profile_validator
+          "$validator" -p "${{ github.workspace }}/resources/profiles" -l 2
+          "$validator" -p "${{ github.workspace }}/resources/profiles" -s -l 2

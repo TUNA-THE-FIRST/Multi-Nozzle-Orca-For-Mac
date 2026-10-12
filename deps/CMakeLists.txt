@@ -123,8 +123,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 # Sentry crash reporting - on by default everywhere except the Flatpak build
-# (Flathub distribution stays telemetry-free).
-if (WIN32 OR APPLE OR (UNIX AND NOT FLATPAK))
+# (Flathub distribution stays telemetry-free) and Snapmaker Orca Mac (see the main CMakeLists.txt).
+if (WIN32 OR (UNIX AND NOT APPLE AND NOT FLATPAK))
     set(SLIC3R_SENTRY_DEFAULT ON)
 else()
     set(SLIC3R_SENTRY_DEFAULT OFF)

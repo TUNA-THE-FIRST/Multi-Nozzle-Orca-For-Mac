@@ -733,6 +733,73 @@ bool static check_old_linux_datadir(const wxString& app_name) {
 }
 #endif
 
+#ifdef __APPLE__
+// Snapmaker Orca Mac, first launch: offer to copy official Snapmaker Orca's settings into this app's own
+// settings folder. Copies, never moves, so official Snapmaker Orca keeps working as before.
+void GUI_App::offer_settings_import()
+{
+    namespace fs = boost::filesystem;
+    const std::string source = std::move(m_settings_import_source);
+    if (source.empty())
+        return;
+
+    wxMessageDialog ask(nullptr,
+        wxString::Format(_L("%s keeps its settings separately from Snapmaker Orca, so the two apps never overwrite each other's printers and presets.\n\n"
+                            "Do you want to copy your printers, filaments, process presets and preferences from Snapmaker Orca?\n\n"
+                            "They are copied from:\n%s\n\nSnapmaker Orca itself is not changed."),
+                         SLIC3R_MAC_APP_NAME, from_u8(source)),
+        _L("Import settings from Snapmaker Orca"), wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION);
+    ask.SetYesNoLabels(_L("Copy my settings"), _L("Start fresh"));
+    if (ask.ShowModal() != wxID_YES)
+        return;
+
+    // Logs, caches, crash databases and instance locks belong to the other app's own runs.
+    static const std::set<std::string> skipped = { "log", "cache", "SentryData", "tmp" };
+    const fs::path target(data_dir());
+    std::string    failure;
+    try {
+        for (const fs::directory_entry &entry : fs::directory_iterator(source)) {
+            const std::string name = entry.path().filename().string();
+            if (skipped.count(name) || boost::ends_with(name, ".lock"))
+                continue;
+            if (fs::is_directory(entry.path())) {
+                if (!copy_directory_recursively(entry.path(), target / name, nullptr, true))
+                    failure = entry.path().string();
+            } else {
+                fs::copy_file(entry.path(), target / name, fs::copy_options::overwrite_existing);
+            }
+            if (!failure.empty())
+                break;
+        }
+    } catch (const std::exception &ex) {
+        failure = ex.what();
+    }
+
+    if (!failure.empty()) {
+        BOOST_LOG_TRIVIAL(error) << "Importing settings from " << source << " failed: " << failure;
+        wxMessageDialog(nullptr,
+            wxString::Format(_L("Some settings could not be copied from Snapmaker Orca.\n\n"
+                                "What failed: %s\n\n"
+                                "Why this can happen: macOS denied access to the folder, the disk is full, or Snapmaker Orca was "
+                                "changing its files while they were copied.\n\n"
+                                "How to fix it: quit Snapmaker Orca, then in Finder copy the contents of\n%s\ninto\n%s\n"
+                                "while %s is closed. Settings copied so far are kept."),
+                             from_u8(failure), from_u8(source), from_u8(target.string()), SLIC3R_MAC_APP_NAME),
+            _L("Import settings from Snapmaker Orca"), wxOK | wxICON_WARNING).ShowModal();
+    }
+
+    // The constructor read the empty preferences of a first launch; read the imported ones instead.
+    app_config->reset();
+    if (app_config->exists()) {
+        m_app_conf_exists = true;
+        m_config_corrupted = !app_config->load().empty();
+        m_last_config_version = app_config->orig_version();
+    }
+    m_shortcuts->load(*app_config);
+    init_download_path();
+}
+#endif
+
 struct FileWildcards {
     const char*                 title_id;
     std::vector<std::string_view> file_extensions;
@@ -2865,7 +2932,14 @@ void GUI_App::init_webview_runtime()
 void GUI_App::init_app_config()
 {
 	// Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
+#ifdef __APPLE__
+    // Snapmaker Orca Mac keeps its settings apart from official Snapmaker Orca, so the two can be installed
+    // side by side without overwriting each other's presets. The app name also titles the macOS app menu.
+    SetAppName(SLIC3R_DATA_DIR_NAME);
+    SetAppDisplayName(SLIC3R_MAC_APP_NAME);
+#else
     SetAppName(SLIC3R_APP_KEY);
+#endif
 //	SetAppName(SLIC3R_APP_KEY "-alpha");
 //  SetAppName(SLIC3R_APP_KEY "-beta");
 //	SetAppDisplayName(SLIC3R_APP_NAME);
@@ -2898,6 +2972,18 @@ void GUI_App::init_app_config()
                 //BBS create folder if not exists
                 data_dir_path = boost::filesystem::path(data_dir);
                 set_data_dir(data_dir);
+            #ifdef __APPLE__
+                // A first launch finds no settings of its own; remember official Snapmaker Orca's, which
+                // on_init_inner() offers to copy once a dialog can be shown.
+                {
+                    boost::system::error_code ec;
+                    const boost::filesystem::path official = data_dir_path.parent_path() / SLIC3R_APP_KEY;
+                    if (official != data_dir_path &&
+                        !boost::filesystem::exists(data_dir_path / (SLIC3R_APP_KEY ".conf"), ec) &&
+                        boost::filesystem::exists(official / (SLIC3R_APP_KEY ".conf"), ec))
+                        m_settings_import_source = official.string();
+                }
+            #endif
             #else
                 // Since version 2.3, config dir on Linux is in ${XDG_CONFIG_HOME}.
                 // https://github.com/prusa3d/PrusaSlicer/issues/2911
@@ -3462,6 +3548,9 @@ bool GUI_App::on_init_inner()
         std::cerr << "Quitting, user chose to move their data to new location." << std::endl;
         return false;
     }
+#endif
+#ifdef __APPLE__
+    offer_settings_import();
 #endif
 
     BOOST_LOG_TRIVIAL(info) << boost::format("gui mode, Current Snapmaker_Orca Version %1%")%Snapmaker_VERSION;

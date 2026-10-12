@@ -13,12 +13,14 @@
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.snapmaker.snapmaker-orca</string>
+	<string>${MACOSX_BUNDLE_GUI_IDENTIFIER}</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleLongVersionString</key>
 	<string>${MACOSX_BUNDLE_LONG_VERSION_STRING}</string>
 	<key>CFBundleName</key>
+	<string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
+	<key>CFBundleDisplayName</key>
 	<string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
@@ -115,6 +117,23 @@
 		<dict>
 			<key>CFBundleTypeExtensions</key>
 			<array>
+			<string>step</string>
+			<string>STEP</string>
+			<string>stp</string>
+			<string>STP</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>images/Snapmaker_Orca.icns</string>
+			<key>CFBundleTypeName</key>
+			<string>STEP</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
 			<string>gcode</string>
 			<string>GCODE</string>
 			</array>
@@ -135,7 +154,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>${MACOSX_BUNDLE_COPYRIGHT}</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Snapmaker Orca needs access to your local network to discover and connect to your 3D printer(s), and to serve the app's device interface on localhost.</string>
+	<string>${MACOSX_BUNDLE_BUNDLE_NAME} needs access to your local network to discover and connect to your 3D printer(s), and to serve the app's device interface on localhost.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_http._tcp</string>

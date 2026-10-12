@@ -4,6 +4,14 @@
 set(SLIC3R_APP_NAME "Snapmaker Orca")
 set(SLIC3R_APP_KEY "Snapmaker_Orca")
 
+# Snapmaker Orca Mac: this macOS build installs next to official Snapmaker Orca, so it has its own
+# bundle name, bundle identifier and settings folder (~/Library/Application Support/<SLIC3R_DATA_DIR_NAME>).
+# SLIC3R_APP_NAME / SLIC3R_APP_KEY stay as they are: they are written into G-code headers, 3MF metadata
+# and the HTTP user agent, which printers and Snapmaker's services read to recognize the slicer.
+set(SLIC3R_MAC_APP_NAME "Snapmaker Orca Mac")
+set(SLIC3R_MAC_BUNDLE_ID "io.github.tuna-the-first.snapmaker-orca-mac")
+set(SLIC3R_DATA_DIR_NAME "Snapmaker_Orca_Mac")
+
 if(NOT DEFINED BBL_RELEASE_TO_PUBLIC)
 set(BBL_RELEASE_TO_PUBLIC "1")
 endif()
