@@ -74,11 +74,20 @@ std::pair<std::string, std::vector<size_t>> SlicingProcessCompletedEvent::format
     try {
         this->rethrow_exception();
     } catch (const std::bad_alloc& ex) {
-        wxString errmsg = GUI::from_u8(boost::format(_utf8(L("An error occurred. The system may have run out of memory, or a bug may have occurred."))).str());
+        wxString errmsg = GUI::from_u8(boost::format(_utf8(L("Slicing stopped because the app ran out of memory.\n\n"
+                                                             "Why this can happen: the models are very detailed (millions of triangles), the plate holds many "
+                                                             "objects, or settings such as fuzzy skin, very fine layers or tree supports multiply the work; "
+                                                             "other apps may also be using most of the Mac's memory.\n"
+                                                             "How to fix it: quit other apps and slice again. If it still fails, simplify the models "
+                                                             "(right-click an object > Simplify Model), split the objects over several plates, or use a "
+                                                             "larger layer height."))).str());
         error           = std::string(errmsg.ToUTF8()) + "\n" + std::string(ex.what());
     } catch (const HardCrash& ex) {
-        error = GUI::format(_u8L("A fatal error occurred: \"%1%\""), ex.what()) + "\n" +
-                _u8L("Please save your project and restart the application.");
+        error = GUI::format(_u8L("Slicing crashed with an internal error: \"%1%\""), ex.what()) + "\n\n" +
+                _u8L("Why this can happen: a bug in the slicer, usually triggered by an unusual model or combination of settings.\n"
+                     "How to fix it: save the project (File > Save Project As), quit and reopen the app, then slice again. If it crashes "
+                     "again, repair the model (right-click it > Fix Model) or change the setting you edited last, and report the "
+                     "problem with the saved project.");
     } catch (PlaceholderParserError& ex) {
         error     = ex.what();
         monospace = 1;
@@ -845,40 +854,61 @@ void BackgroundSlicingProcess::finalize_gcode()
         remove_post_processed_temp_file();
     } catch (...) {
         remove_post_processed_temp_file();
-        throw Slic3r::ExportError(_u8L("Unknown error occurred during exporting G-code."));
+        throw Slic3r::ExportError(_u8L("The G-code could not be exported because of an unexpected error while copying it.\n\n"
+                                       "How to fix it: export again, to another folder if it fails twice. If it keeps failing, "
+                                       "report it with the newest log from Help > Show Configuration Folder > log."));
     }
     switch (copy_ret_val) {
     case CopyFileResult::SUCCESS: break; // no error
     case CopyFileResult::FAIL_COPY_FILE:
         throw Slic3r::ExportError(GUI::format(
             m_export_path_on_removable_media ?
-                _L("Copying of the temporary G-code to the output G-code failed. Maybe the SD card is write locked?\nError message: %1%") :
-                _L("Copying of the temporary G-code to the output G-code failed.\nError message: %1%"),
+                _L("The G-code could not be written to the SD card or USB drive.\nError: %1%\n\n"
+                   "Why this can happen: the card is write-protected (check the lock switch on its side), full, or was removed "
+                   "while writing.\n"
+                   "How to fix it: unlock or reinsert the card, make room on it, and export again.") :
+                _L("The G-code could not be written to the chosen folder.\nError: %1%\n\n"
+                   "Why this can happen: the folder is read-only or macOS has not allowed this app to use it (Desktop, Documents "
+                   "and Downloads need permission), or the disk is full.\n"
+                   "How to fix it: choose another folder, or allow access in System Settings > Privacy & Security > Files and "
+                   "Folders, make room on the disk, and export again."),
             error_message));
         break;
     case CopyFileResult::FAIL_FILES_DIFFERENT:
         throw Slic3r::ExportError(
-            GUI::format(_L("Copying of the temporary G-code to the output G-code failed. There might be problem with target device, please "
-                           "try exporting again or using different device. The corrupted output G-code is at %1%.tmp."),
+            GUI::format(_L("The G-code was written, but the copy on the target does not match the original, so it would print "
+                           "wrong.\n\n"
+                           "Why this can happen: the SD card or USB drive is failing, was removed too early, or is almost full.\n"
+                           "How to fix it: export again, or to another card or drive. The damaged copy was kept as %1%.tmp; "
+                           "delete it."),
                         export_path));
         break;
     case CopyFileResult::FAIL_RENAMING:
-        throw Slic3r::ExportError(GUI::format(_L("Renaming of the G-code after copying to the selected destination folder has failed. "
-                                                 "Current path is %1%.tmp. Please try exporting again."),
+        throw Slic3r::ExportError(GUI::format(_L("The G-code was copied but could not be given its final name.\n\n"
+                                                 "Why this can happen: a file with that name is open in another app or locked, or the "
+                                                 "folder does not allow renaming.\n"
+                                                 "How to fix it: close the other app or choose another name, then export again. The "
+                                                 "copied file is at %1%.tmp."),
                                               export_path));
         break;
     case CopyFileResult::FAIL_CHECK_ORIGIN_NOT_OPENED:
-        throw Slic3r::ExportError(GUI::format(_L("Copying of the temporary G-code has finished but the original code at %1% couldn't be "
-                                                 "opened during copy check. The output G-code is at %2%.tmp."),
+        throw Slic3r::ExportError(GUI::format(_L("The G-code was copied, but the copy could not be checked because the temporary "
+                                                 "original at %1% could not be opened.\n\n"
+                                                 "Why this can happen: macOS cleaned up the temporary folder, or the disk is full.\n"
+                                                 "How to fix it: slice and export again. The unchecked copy is at %2%.tmp."),
                                               output_path, export_path));
         break;
     case CopyFileResult::FAIL_CHECK_TARGET_NOT_OPENED:
-        throw Slic3r::ExportError(GUI::format(_L("Copying of the temporary G-code has finished but the exported code couldn't be opened "
-                                                 "during copy check. The output G-code is at %1%.tmp."),
+        throw Slic3r::ExportError(GUI::format(_L("The G-code was copied, but the copy could not be read back to check it.\n\n"
+                                                 "Why this can happen: the SD card or USB drive was removed or is failing.\n"
+                                                 "How to fix it: reinsert the card or drive and export again. The unchecked copy is at "
+                                                 "%1%.tmp."),
                                               export_path));
         break;
     default:
-        throw Slic3r::ExportError(_u8L("Unknown error occurred during exporting G-code."));
+        throw Slic3r::ExportError(_u8L("The G-code could not be exported because of an unexpected error while copying it.\n\n"
+                                       "How to fix it: export again, to another folder if it fails twice. If it keeps failing, "
+                                       "report it with the newest log from Help > Show Configuration Folder > log."));
         BOOST_LOG_TRIVIAL(error) << "Unexpected fail code(" << (int) copy_ret_val << ") durring copy_file() to " << export_path << ".";
         break;
     }
@@ -901,7 +931,9 @@ void BackgroundSlicingProcess::export_gcode()
     try {
         copy_ret_val = copy_file(output_path, export_path, error_message, m_export_path_on_removable_media);
     } catch (...) {
-        throw Slic3r::ExportError(_utf8(L("Unknown error with G-code export")));
+        throw Slic3r::ExportError(_utf8(L("The G-code could not be exported because of an unexpected error while copying it.\n\n"
+                                          "How to fix it: export again, to another folder if it fails twice. If it keeps failing, "
+                                          "report it with the newest log from Help > Show Configuration Folder > log.")));
     }
     switch (copy_ret_val) {
     case CopyFileResult::SUCCESS: break; // no error
@@ -924,7 +956,12 @@ void BackgroundSlicingProcess::export_gcode()
     default:
         BOOST_LOG_TRIVIAL(error) << "Fail code(" << (int) copy_ret_val << ") when copy " << output_path << " to " << export_path << ".";
         throw Slic3r::ExportError(
-            (boost::format(_utf8(L("Failed to save G-code file.\nError message: %1%.\nSource file %2%."))) % error_message % output_path)
+            (boost::format(_utf8(L("The G-code could not be saved.\nError: %1%\nTemporary file: %2%\n\n"
+                                   "Why this can happen: the folder is read-only or macOS has not allowed this app to use it "
+                                   "(Desktop, Documents and Downloads need permission), the disk or SD card is full, or the card "
+                                   "was removed.\n"
+                                   "How to fix it: choose another folder, or allow access in System Settings > Privacy & Security > "
+                                   "Files and Folders, make room, and export again."))) % error_message % output_path)
                 .str());
         // throw Slic3r::ExportError(_utf8(L("Unknown error when exporting G-code.")));
         break;
@@ -954,7 +991,11 @@ void BackgroundSlicingProcess::prepare_upload()
             m_print->set_status(95, _utf8(L("Running post-processing scripts")));
             std::string error_message;
             if (copy_file(m_temp_output_path, source_path.string(), error_message) != SUCCESS)
-                throw Slic3r::RuntimeError(_utf8(L("Copying of the temporary G-code to the output G-code failed.")));
+                throw Slic3r::RuntimeError(_utf8(L("The post-processed G-code could not be copied for upload.\n\n"
+                                                   "Why this can happen: the post-processing script removed or renamed its output, "
+                                                   "or the disk is full.\n"
+                                                   "How to fix it: check the script in the process settings under Others > "
+                                                   "Post-processing Scripts, make room on the disk, and slice again.")));
             m_upload_job.upload_data.upload_path = m_fff_print->print_statistics().finalize_output_path(
                 m_upload_job.upload_data.upload_path.string());
             // Orca: skip post-processing scripts for BBL printers as we have run them already in finalize_gcode()

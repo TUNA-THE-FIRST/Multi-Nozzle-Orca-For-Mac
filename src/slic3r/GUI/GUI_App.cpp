@@ -1095,8 +1095,11 @@ static void generic_exception_handle()
      } catch (const boost::io::bad_format_string& ex) {
      	BOOST_LOG_TRIVIAL(error) << boost::format("Uncaught exception: %1%") % ex.what();
         	flush_logs();
-        wxString errmsg = _L("Snapmaker Orca will terminate because of a localization error. "
-                             "It will be appreciated if you report the specific scenario this issue happened.");
+        wxString errmsg = _L("Snapmaker Orca has to close: a translated message has a formatting mistake.\n\n"
+                             "Why this can happen: a translation of the current language does not match the message it "
+                             "translates.\n"
+                             "How to fix it: switch the language to English in Preferences, reopen the app and repeat what "
+                             "you did; please report what you were doing when it happened.");
         wxMessageBox(errmsg + "\n\n" + wxString(ex.what()), _L("Critical error"), wxOK | wxICON_ERROR);
         std::terminate();
         //throw;
@@ -2627,7 +2630,12 @@ void GUI_App::init_networking_callbacks()
                                     text = wxString::Format(_L("Incorrect password"));
                                     wxGetApp().show_dialog(text);
                                 } else {
-                                text = wxString::Format(_L("Connect %s failed! [SN:%s, code=%s]"), from_u8(obj->get_dev_name()), obj->get_dev_id(), msg);
+                                text = wxString::Format(_L("Could not connect to the printer %s (serial number %s, error code %s).\n\n"
+                                                           "Why this can happen: the printer is off, asleep or on another Wi-Fi "
+                                                           "network than this Mac, or its access code changed.\n"
+                                                           "How to fix it: check that the printer is on and connected to the same "
+                                                           "network, check the access code on the printer's screen, and connect again."),
+                                                        from_u8(obj->get_dev_name()), obj->get_dev_id(), msg);
                                     wxGetApp().show_dialog(text);
                                 }
                                 event.SetInt(-1);
@@ -3138,15 +3146,19 @@ void GUI_App::do_notify_flutter_web_copy_failure()
     switch (m_flutter_web_copy_status) {
     case FlutterWebCopyStatus::InstallFailed:
         show_error(mainframe,
-                   _L("Failed to install Web UI resources. Some features may not work correctly.\n"
-                      "Please check disk space and file permissions, then restart the application."));
+                   _L("The app could not install the files for its built-in web pages (Home, the Device tab, the setup "
+                      "wizard), so these may stay blank.\n\n"
+                      "Why this can happen: the disk is full, or the app's settings folder is not writable.\n"
+                      "How to fix it: make room on the disk, check that you can write to the folder opened by Help > Show "
+                      "Configuration Folder, then quit and reopen the app."));
         break;
     case FlutterWebCopyStatus::UpgradeFailed:
         if (notification_manager()) {
             notification_manager()->push_notification(
                 NotificationType::CustomNotification,
                 NotificationManager::NotificationLevel::WarningNotificationLevel,
-                _u8L("Failed to update Web UI resources. The application will continue using the previous version."));
+                _u8L("The app's built-in web pages could not be updated, so the previous version is kept. Make room on the "
+                     "disk and reopen the app to try again."));
         }
         break;
     default: 
@@ -4135,8 +4147,12 @@ bool GUI_App::on_init_inner()
         m_config_corrupted = false;
         show_error(nullptr,
                    _u8L(
-                       "The Snapmaker Orca configuration file may be corrupted and cannot be parsed.\nSnapmaker Orca has attempted to recreate the "
-                       "configuration file.\nPlease note, application settings will be lost, but printer profiles will not be affected."));
+                       "The app's preferences file could not be read, so it was replaced with a new one: preferences such as "
+                       "the language, units and recent projects are reset. Your printer, filament and process presets are "
+                       "not affected.\n\n"
+                       "Why this can happen: the app or the Mac shut down while the file was being saved, or the file was "
+                       "edited by hand.\n"
+                       "How to fix it: set your preferences again in Preferences."));
     }
 
     do_notify_flutter_web_copy_failure();
@@ -5707,7 +5723,8 @@ void GUI_App::import_presets()
         preset_updater->import_system_profile();
     }
     else {
-        MessageDialog(nullptr, _L("import failed!")).ShowModal();
+        MessageDialog(nullptr, _L("The import could not start because the profile updater is not ready yet. Wait until "
+                                  "the app has finished starting and try again.")).ShowModal();
     }
 }
 
@@ -6423,7 +6440,8 @@ void GUI_App::request_project_download(std::string project_id)
 void GUI_App::request_open_project(std::string project_id)
 {
     if (plater()->is_background_process_slicing()) {
-        Slic3r::GUI::show_info(nullptr, _L("new or open project file is not allowed during the slicing process!"), _L("Open Project"));
+        Slic3r::GUI::show_info(nullptr, _L("A project cannot be created or opened while the plate is being sliced. Wait until "
+                                           "slicing finishes, or stop it, and try again."), _L("Open Project"));
         return;
     }
 
@@ -7425,7 +7443,11 @@ bool GUI_App::process_network_msg(std::string dev_id, std::string msg)
         else if (msg == "update_firmware_studio") {
             BOOST_LOG_TRIVIAL(info) << "process_network_msg, firmware internal error";
             if (!m_show_error_msgdlg) {
-                MessageDialog msg_dlg(nullptr, _L("Internal error. Please try upgrading the firmware and OrcaSlicer version. If the issue persists, contact support."), "", wxAPPLY | wxOK);
+                MessageDialog msg_dlg(nullptr, _L("The printer reported an internal error while talking to the app.\n\n"
+                                                  "Why this can happen: the printer firmware and the network plugin are of versions "
+                                                  "that do not work together.\n"
+                                                  "How to fix it: update the printer's firmware from its screen or the Device tab, "
+                                                  "update the network plugin, then reconnect."), "", wxAPPLY | wxOK);
                 m_show_error_msgdlg = true;
                 msg_dlg.ShowModal();
                 m_show_error_msgdlg = false;
@@ -7953,7 +7975,10 @@ bool GUI_App::maybe_migrate_user_presets_on_login()
     } catch (const std::exception& ex) {
         BOOST_LOG_TRIVIAL(error) << "Failed to migrate user presets: " << ex.what();
         wxString err_msg = wxString::Format(
-            _L("Failed to migrate user presets:\n%s"),
+            _L("Your own presets could not be moved to the new preset format.\nError: %s\n\n"
+               "Why this can happen: a preset file is damaged or not readable, or the disk is full.\n"
+               "How to fix it: make room on the disk and reopen the app. If it fails again, move the file named in the "
+               "error out of the user folder opened by Help > Show Configuration Folder, and reopen the app."),
             from_u8(ex.what()));
         show_error(nullptr, err_msg);
         return false;
@@ -9237,13 +9262,14 @@ bool GUI_App::load_language(wxString language, bool initial)
 
     if (!wxLocale::IsAvailable(locale_language_info->Language)) {
     	// Loading the language dictionary failed.
-	    wxString message = wxString::Format(_L("Switching Snapmaker Orca to language %s failed."), requested_language_code);
+	    wxString message = wxString::Format(_L("Snapmaker Orca could not switch to the language %s because the system has no "
+	                                           "locale for it. Choose another language in Preferences."), requested_language_code);
 #if !defined(_WIN32) && !defined(__APPLE__)
         // likely some linux system
         message += _L("\nYou may need to reconfigure the missing locales, likely by running the \"locale-gen\" and \"dpkg-reconfigure locales\" commands.\n");
 #endif
         if (initial)
-        	message + "\n\nApplication will close.";
+        	message += "\n\n" + _L("The application will close.");
         wxMessageBox(message, _L("Snapmaker Orca - Switching language failed"), wxOK | wxICON_ERROR);
         if (initial)
 			std::exit(EXIT_FAILURE);
@@ -11317,7 +11343,8 @@ void GUI_App::start_download(std::string url)
     //lets always init so if the download dest folder was changed, new dest is used
     boost::filesystem::path dest_folder(app_config->get("download_path"));
     if (dest_folder.empty() || !boost::filesystem::is_directory(dest_folder)) {
-        std::string msg = _u8L("Could not start URL download. Destination folder is not set. Please choose destination folder in Configuration Wizard.");
+        std::string msg = _u8L("The download could not start because the downloads folder is not set or no longer exists.\n\n"
+                               "How to fix it: choose a downloads folder in Preferences > Downloads folder and open the link again.");
         BOOST_LOG_TRIVIAL(error) << msg;
         show_error(nullptr, msg);
         return;
