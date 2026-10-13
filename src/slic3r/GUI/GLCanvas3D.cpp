@@ -1525,7 +1525,8 @@ static bool construct_error_string(ObjectFilamentResults& object_result, std::st
 {
     error_string.clear();
     if (!object_result.partly_outside_objects.empty()) {
-        error_string += _u8L("Following objects are laid over the boundary of plate or exceeds the height limit:\n");
+        error_string += _u8L("These objects stick out over the edge of the plate or are taller than the printer can "
+                             "print. Move them completely onto the plate and check their height:\n");
         for(auto& object: object_result.partly_outside_objects)
         {
             error_string += object->name;
@@ -11461,10 +11462,14 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
             }
 
             if (error_iter->second.size() == 1) {
-                text += (boost::format(_u8L("Filament %s is placed in the %s, but the generated G-code path exceeds the printable range of the %s.")) %filaments %extruder_name %extruder_name).str();
+                text += (boost::format(_u8L("Filament %s is printed by the %s, but part of its print lies outside "
+                                            "the area the %s can reach. Move the objects into the area it reaches, "
+                                            "or assign the filament to another nozzle.")) %filaments %extruder_name %extruder_name).str();
             }
             else {
-                text += (boost::format(_u8L("Filaments %s are placed in the %s, but the generated G-code path exceeds the printable range of the %s.")) %filaments %extruder_name %extruder_name).str();
+                text += (boost::format(_u8L("Filaments %s are printed by the %s, but part of their print lies "
+                                            "outside the area the %s can reach. Move the objects into the area it "
+                                            "reaches, or assign the filaments to another nozzle.")) %filaments %extruder_name %extruder_name).str();
             }
         }
         error = ErrorType::SLICING_LIMIT_ERROR;
@@ -11514,9 +11519,13 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
             }
             std::string extruder_name = extruder_name_list[extruder_id-1];
             if (error_iter->second.size() == 1) {
-                text += (boost::format(_u8L("Filament %s is placed in the %s, but the generated G-code path exceeds the printable height of the %s.")) % filaments % extruder_name % extruder_name).str();
+                text += (boost::format(_u8L("Filament %s is printed by the %s, but its print is taller than the %s "
+                                            "can reach. Lower or scale down the objects, or assign the filament to "
+                                            "another nozzle.")) % filaments % extruder_name % extruder_name).str();
             } else {
-                text += (boost::format(_u8L("Filaments %s are placed in the %s, but the generated G-code path exceeds the printable height of the %s.")) % filaments % extruder_name % extruder_name).str();
+                text += (boost::format(_u8L("Filaments %s are printed by the %s, but their print is taller than the "
+                                            "%s can reach. Lower or scale down the objects, or assign the filaments "
+                                            "to another nozzle.")) % filaments % extruder_name % extruder_name).str();
             }
         }
         if (!text.empty()) {
@@ -11549,7 +11558,9 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
             warning += std::to_string(filament + 1);
             warning += " ";
         }
-        text  = (boost::format(_u8L("Filaments %s cannot be printed directly on the surface of this plate.")) % warning).str();
+        text  = (boost::format(_u8L("Filaments %s can't be printed directly on this plate type: they don't stick to "
+                                    "it, or they damage it. Choose another plate type (in the sidebar or the plate's "
+                                    "settings), or use another filament for the first layer.")) % warning).str();
         error = ErrorType::SLICING_ERROR;
         break;
     }

@@ -8178,7 +8178,9 @@ void GUI_App::sync_preset(Preset* preset, bool force)
             dialog_notified = true;
             if (mainframe == nullptr)
                 return;
-            auto msg = _L("The number of user presets cached in the cloud has exceeded the upper limit, newly created user presets can only be used locally.");
+            auto msg = _L("Your account has reached the maximum number of presets the cloud keeps, so new presets "
+                          "are saved on this Mac only and don't sync. Delete presets you no longer need to make room "
+                          "in the cloud.");
             MessageDialog(mainframe, msg, _L("Sync user presets"), wxICON_WARNING | wxOK).ShowModal();
         });
         return; // this error not need hold, and should not hold
@@ -9549,7 +9551,8 @@ void GUI_App::open_plugins_dialog(size_t open_on_tab, const std::string& highlig
             m_plugins_dlg->Destroy();
             m_plugins_dlg = nullptr;
         }
-        wxMessageBox(wxString::Format(_L("Failed to open the Plugins dialog:\n%s"), from_u8(e.what())), _L("Plugins"),
+        wxMessageBox(wxString::Format(_L("The Plugins window could not be opened:\n"
+                                         "%s\nRestart the app and try again."), from_u8(e.what())), _L("Plugins"),
                      wxOK | wxICON_ERROR, mainframe);
     } catch (...) {
         BOOST_LOG_TRIVIAL(error) << "open_plugins_dialog failed with a non-standard exception";
@@ -9557,7 +9560,8 @@ void GUI_App::open_plugins_dialog(size_t open_on_tab, const std::string& highlig
             m_plugins_dlg->Destroy();
             m_plugins_dlg = nullptr;
         }
-        wxMessageBox(_L("Failed to open the Plugins dialog (unknown error)."), _L("Plugins"), wxOK | wxICON_ERROR, mainframe);
+        wxMessageBox(_L("The Plugins window could not be opened because of an unexpected error. Restart the app and "
+                        "try again."), _L("Plugins"), wxOK | wxICON_ERROR, mainframe);
     }
 }
 
@@ -9591,7 +9595,8 @@ void GUI_App::refresh_plugins()
                 plater->get_notification_manager()->push_notification(
                     NotificationType::CustomNotification,
                     NotificationManager::NotificationLevel::ErrorNotificationLevel,
-                    into_u8(wxString::Format(_L("Failed to refresh plugins: %s"), error)));
+                    into_u8(wxString::Format(_L("The plugin list could not be refreshed: %s. Check your internet "
+                                                "connection and try again."), error)));
         });
     }).detach();
 }

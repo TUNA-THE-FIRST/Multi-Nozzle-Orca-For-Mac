@@ -117,7 +117,8 @@ void copy_file_fix(const fs::path &source, const fs::path &target)
 	if (cfr != CopyFileResult::SUCCESS) {
 		BOOST_LOG_TRIVIAL(error) << "Copying failed(" << cfr << "): " << error_message;
 		throw Slic3r::CriticalException(GUI::format(
-				_L("Copying of file %1% to %2% failed: %3%"),
+				_L("Copying %1% to %2% failed: %3%. Make sure the disk has free space and the app's data folder can be written "
+       "to, then restart the app."),
 				source, target, error_message));
 	}
 	// Permissions should be copied from the source file by copy_file(). We are not sure about the source
@@ -875,7 +876,9 @@ void PresetUpdater::priv::download_flutter_resource_async(const std::string& url
             BOOST_LOG_TRIVIAL(error) << "[Flutter Updater] Download failed: " << target_path << ", HTTP status: " << http_status << ", error: " << error;
             if (!isAuto_check) {
                 wxCommandEvent* evt = new wxCommandEvent(EVT_REQUEST_SERVER_FAIL);
-                wxString errorMsg = wxString::Format(_L("Flutter resource download failed: %s"), error);
+                wxString errorMsg = wxString::Format(_L("The device page could not be downloaded: %s. Check your "
+                                                        "internet connection and try again; the version that came "
+                                                        "with the app keeps working."), error);
                 evt->SetString(errorMsg);
                 GUI::wxGetApp().QueueEvent(evt);
             }
@@ -941,7 +944,9 @@ void PresetUpdater::priv::download_profiles_resource_async(const std::string& ur
             BOOST_LOG_TRIVIAL(error) << "[Profiles Updater] Download failed: " << target_path << ", HTTP status: " << http_status << ", error: " << error;
             if (!isAuto_check) {
                 wxCommandEvent* evt = new wxCommandEvent(EVT_REQUEST_SERVER_FAIL);
-                wxString errorMsg = wxString::Format(_L("Profiles resource download failed: %s"), error);
+                wxString errorMsg = wxString::Format(_L("The printer profiles could not be downloaded: %s. Check "
+                                                        "your internet connection and try again; the profiles that "
+                                                        "came with the app keep working."), error);
                 evt->SetString(errorMsg);
                 GUI::wxGetApp().QueueEvent(evt);
             }
@@ -975,7 +980,9 @@ void PresetUpdater::priv::download_profiles_resource_async(const std::string& ur
                 BOOST_LOG_TRIVIAL(error) << "[Profiles Updater] Package rejected, " << verdict.reason << ": " << target_path;
                 if (!isAuto_check) {
                     wxCommandEvent* evt = new wxCommandEvent(EVT_REQUEST_SERVER_FAIL);
-                    wxString errorMsg = wxString::Format(_L("Profiles resource download failed: %s"), wxString::FromUTF8(verdict.reason.c_str()));
+                    wxString errorMsg = wxString::Format(_L("The printer profiles could not be downloaded: %s. Check "
+                                                            "your internet connection and try again; the profiles "
+                                                            "that came with the app keep working."), wxString::FromUTF8(verdict.reason.c_str()));
                     evt->SetString(errorMsg);
                     GUI::wxGetApp().QueueEvent(evt);
                 }
@@ -1052,7 +1059,9 @@ void PresetUpdater::priv::sync_update_flutter_resource(bool isAuto_check)
             // The event is allocated only when it is queued, so the silent check does not leak it.
             if (!isAuto_check) {
                 wxCommandEvent* evt = new wxCommandEvent(EVT_REQUEST_SERVER_FAIL);
-                wxString errorMsg = wxString::Format(_L("request to server update web resource fail with body:%s,error:%s,status:%d"), body, error, http_status);
+                wxString errorMsg = wxString::Format(_L("Checking for an update of the device page failed (server "
+                                                        "answer: %s, error: %s, status %d). Check your internet "
+                                                        "connection and try again."), body, error, http_status);
                 evt->SetString(errorMsg);
                 GUI::wxGetApp().QueueEvent(evt);
             }
@@ -1184,7 +1193,9 @@ void PresetUpdater::priv::sync_config(bool isAuto_check)
             // The event is allocated only when it is queued, so the silent check does not leak it.
             if (!isAuto_check) {
                 wxCommandEvent* evt = new wxCommandEvent(EVT_REQUEST_SERVER_FAIL);
-                wxString errorMsg   = wxString::Format(_L("request to server update preset resource fail with body:%s,error:%s,status:%d"), body,error, http_status);
+                wxString errorMsg   = wxString::Format(_L("Checking for printer profile updates failed (server "
+                                                          "answer: %s, error: %s, status %d). Check your internet "
+                                                          "connection and try again."), body,error, http_status);
                 evt->SetString(errorMsg);
                 GUI::wxGetApp().QueueEvent(evt);
             }
@@ -2574,7 +2585,8 @@ void PresetUpdater::priv::check_new_vendors(const std::set<std::string>& system_
                         }
                         if (GUI::Plater* plater = GUI::wxGetApp().plater())
                             plater->get_notification_manager()->push_notification(
-                                _u8L("Failed to download vendor profile(s): ") + vendor_list);
+                                _u8L("These printer profiles could not be downloaded; check your internet connection "
+                                     "(the installed versions keep working): ") + vendor_list);
                     });
                 }
 
@@ -2982,7 +2994,8 @@ void PresetUpdater::load_flutter_web(const std::string& resource_path, bool serv
 
         wxString message;
         if (!outdated_presets.empty() && !serverUpdate) {
-            message = _L("This web resouce could not be imported due to outdated versions.") + "\n";
+            message = _L("These profiles from the web were not imported: they were made for an older version of the "
+                         "app.") + "\n";
             for (const auto& preset : outdated_presets) {
                 message += "• " + preset + "\n";
             }
@@ -3180,7 +3193,8 @@ void PresetUpdater::import_system_profile()
 
         wxString message;
         if (!outdated_presets.empty()) {
-            message = _L("The following profiles could not be imported due to outdated versions.") + "\n";
+            message = _L("These profiles were not imported: they were made for an older version of the app and no "
+                         "longer match its settings.") + "\n";
             for (const auto& preset : outdated_presets) {
                 message += "• " + preset + "\n";
             }

@@ -172,7 +172,14 @@ void ArrangeJob::prepare_selected() {
             m_selected.swap(m_unselected);
         else {
             m_plater->get_notification_manager()->push_notification(NotificationType::BBLPlateInfo,
-                NotificationManager::NotificationLevel::WarningNotificationLevel, into_u8(_L("All the selected objects are on a locked plate.\nCannot auto-arrange these objects.")));
+                NotificationManager::NotificationLevel::WarningNotificationLevel, into_u8(_L("All the selected "
+                                                                                             "objects are on a "
+                                                                                             "locked plate, so they "
+                                                                                             "can't be arranged.\n"
+                                                                                             "Unlock the plate first "
+                                                                                             "(the lock icon on the "
+                                                                                             "plate), then arrange "
+                                                                                             "again.")));
             }
         }
 
@@ -242,7 +249,14 @@ void ArrangeJob::prepare_all() {
         }
         else {
             m_plater->get_notification_manager()->push_notification(NotificationType::BBLPlateInfo,
-                NotificationManager::NotificationLevel::WarningNotificationLevel, into_u8(_L("All the selected objects are on a locked plate.\nCannot auto-arrange these objects.")));
+                NotificationManager::NotificationLevel::WarningNotificationLevel, into_u8(_L("All the selected "
+                                                                                             "objects are on a "
+                                                                                             "locked plate, so they "
+                                                                                             "can't be arranged.\n"
+                                                                                             "Unlock the plate first "
+                                                                                             "(the lock icon on the "
+                                                                                             "plate), then arrange "
+                                                                                             "again.")));
         }
     }
 
@@ -394,7 +408,11 @@ void ArrangeJob::prepare_partplate() {
 
     if (plate->is_locked()) {
         m_plater->get_notification_manager()->push_notification(NotificationType::BBLPlateInfo,
-            NotificationManager::NotificationLevel::WarningNotificationLevel, into_u8(_L("This plate is locked.\nCannot auto-arrange on this plate.")));
+            NotificationManager::NotificationLevel::WarningNotificationLevel, into_u8(_L("This plate is locked, so "
+                                                                                         "nothing can be arranged on "
+                                                                                         "it.\nUnlock it first (the "
+                                                                                         "lock icon on the plate), "
+                                                                                         "then arrange again.")));
         return;
     }
 
@@ -622,8 +640,8 @@ void ArrangeJob::finalize(bool canceled, std::exception_ptr &eptr) {
         if (eptr)
             std::rethrow_exception(eptr);
     } catch (libnest2d::GeometryException &) {
-        show_error(m_plater, _(L("Arrange failed. "
-                                 "Found some exceptions when processing object geometries.")));
+        show_error(m_plater, _(L("Arranging failed: the shape of an object could not be processed, usually because "
+                                 "its mesh has errors. Repair the objects (right-click, Fix Model) and arrange again.")));
         eptr = nullptr;
     } catch (...) {
         eptr = std::current_exception();
@@ -726,7 +744,8 @@ void ArrangeJob::finalize(bool canceled, std::exception_ptr &eptr) {
             names.insert(mi->get_object()->name);
 
         m_plater->get_notification_manager()->push_notification(GUI::format(
-            _L("Arrangement ignored the following objects which can't fit into a single bed:\n%s"),
+            _L("These objects are larger than the plate, so they were left out of the arrangement:\n"
+               "%s\nScale them down or cut them to fit."),
             concat_strings(names, "\n")));
     }
     m_plater->get_notification_manager()->close_notification_of_type(NotificationType::ArrangeOngoing);

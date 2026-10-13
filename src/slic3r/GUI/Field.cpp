@@ -695,17 +695,20 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                 set_value(str_out, true);
                 wxString error_str;
                 if (errors.has(ThumbnailError::InvalidVal))
-                    error_str += format_wxstr(_L("Invalid input format. Expected vector of dimensions in the following format: \"%1%\""),
+                    error_str += format_wxstr(_L("This value isn't in the expected format. Enter the sizes like "
+                                                 "this: \"%1%\""),
                                               "XxY/EXT, XxY/EXT, ...");
                 if (errors.has(ThumbnailError::OutOfRange)) {
                     if (!error_str.empty())
                         error_str += "\n\n";
-                    error_str += _L("Input value is out of range");
+                    error_str += _L("A thumbnail size is out of range: each side must be between 1 and 999 pixels, "
+                                    "for example 300x300.");
                 }
                 if (errors.has(ThumbnailError::InvalidExt)) {
                     if (!error_str.empty())
                         error_str += "\n\n";
-                    error_str += _L("Some extension in the input is invalid");
+                    error_str += _L("A thumbnail format isn't supported. After each size, use PNG, JPG, QOI, BTT_TFT "
+                                    "or ColPic, for example 300x300/PNG.");
                 }
                 show_error(m_parent, error_str);
             } else if (str_out != str) {
@@ -780,7 +783,8 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                 wxString text_value;
                 if (!m_value.empty()) text_value = get_thumbnail_string(boost::any_cast<Vec2d>(m_value));
                 set_value(text_value, true);
-                show_error(m_parent, format_wxstr(_L("Invalid format. Expected vector format: \"%1%\""), "XxY, XxY, ..."));
+                show_error(m_parent, format_wxstr(_L("This value isn't in the expected format. Enter it like this: \""
+                                                     "%1%\""), "XxY, XxY, ..."));
             }
         }
 
@@ -816,7 +820,8 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                 if (!m_value.empty())
                     text_value = get_thumbnails_string(boost::any_cast<std::vector<Vec2d>>(m_value));
                 set_value(text_value, true);
-                show_error(m_parent, format_wxstr(_L("Invalid format. Expected vector format: \"%1%\""),"XxY, XxY, ..." ));
+                show_error(m_parent, format_wxstr(_L("This value isn't in the expected format. Enter it like this: \""
+                                                     "%1%\""),"XxY, XxY, ..." ));
             }
         }
 

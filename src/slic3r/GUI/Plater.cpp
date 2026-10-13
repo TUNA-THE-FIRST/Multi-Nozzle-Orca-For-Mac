@@ -992,7 +992,8 @@ bool Plater::has_illegal_filename_characters(const std::string& name)
 
 void Plater::show_illegal_characters_warning(wxWindow* parent)
 {
-    show_error(parent, _L("Invalid name, the following characters are not allowed:") + " <>:/\\|?*\"");
+    show_error(parent, _L("This name can't be used: it contains characters that are not allowed in file names. "
+                          "Remove these characters:") + " <>:/\\|?*\"");
 }
 
 void Plater::mark_plate_toolbar_image_dirty()
@@ -2719,7 +2720,8 @@ private:
                 m_error_label->SetLabel(wxEmptyString);
             else if (!valid && m_has_recipe_result)
                 m_error_label->SetLabel(
-                    _L("Unable to create a color mix from the current physical filament colors within the selected range."));
+                    _L("No mix of the loaded filament colors comes close to this color within the selected range. "
+                       "Widen the range, pick a color closer to your filaments, or load a filament nearer to it."));
             else if (m_hex_input && !m_syncing_inputs) {
                 wxColour parsed;
                 if (!try_parse_color_match_hex(m_hex_input->GetValue(), parsed))
@@ -3336,7 +3338,9 @@ bool Sidebar::priv::switch_diameter_to(const wxString &diameter)
     auto preset          = wxGetApp().preset_bundle->get_similar_printer_preset({}, diameter.ToStdString());
     if (preset == nullptr) {
         // ORCA add a text. this appears when user tries to change nozzle value but config doesnt have a inherited or compatible preset
-        MessageDialog dlg(this->plater, _L("Configuration incompatible"), _L("Warning"), wxICON_WARNING | wxOK);
+        MessageDialog dlg(this->plater, _L("The printer has no profile for this nozzle size, so the nozzle size was "
+                                           "not changed. Choose a size the printer has a profile for, or add a "
+                                           "printer profile for this nozzle in the printer settings."), _L("Warning"), wxICON_WARNING | wxOK);
         dlg.ShowModal();
         return false;
     }
@@ -5348,7 +5352,8 @@ Sidebar::Sidebar(Plater *parent)
         if (recipe.cancelled)
             return;
         if (!recipe.valid) {
-            show_error(this, _L("Unable to create a color match from the current physical filament colors."));
+            show_error(this, _L("No mix of the loaded filament colors comes close enough to the chosen color. Pick a "
+                                "color closer to your filaments, or load a filament nearer to it, and try again."));
             return;
         }
 
@@ -12066,7 +12071,9 @@ void Sidebar::update_nozzle_settings(bool switch_machine)
             if (new_height > nd_opt->values[i] + EPSILON) {
                 wxGetApp().plater()->get_notification_manager()->push_notification(
                     NotificationType::CustomNotification, NotificationManager::NotificationLevel::WarningNotificationLevel,
-                    GUI::format(_u8L("The layer height of extruder %1% cannot exceed its nozzle diameter (%2% mm)."), i + 1, nd_opt->values[i]));
+                    GUI::format(_u8L("The layer height of extruder %1% cannot exceed its nozzle diameter (%2% mm): a "
+                                     "nozzle can't extrude a layer thicker than its opening. Choose a lower layer "
+                                     "height, or set the nozzle size that is really installed if it is larger."), i + 1, nd_opt->values[i]));
                 show_nozzle_layer_height(lh_field, i);
                 return;
             }
@@ -16621,7 +16628,11 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                             }
                             if (any_entry) {
                                 error_message += "\n";
-                                error_message += _u8L("Please correct them in the Param tabs");
+                                error_message += _u8L("These settings of the project have values this app does not "
+                                                      "accept, often because the project was made with another "
+                                                      "version or another slicer. Correct them in the printer, "
+                                                      "filament and process settings; the list above names each "
+                                                      "setting.");
                                 notify_manager->bbl_show_3mf_warn_notification(error_message);
                             }
                         }
@@ -18794,7 +18805,9 @@ void Plater::priv::notify_filament_compatibility_after_apply()
         notification_manager->push_notification(
             NotificationType::FilamentIncompatibleMixed,
             NotificationManager::NotificationLevel::ErrorNotificationLevel,
-            into_u8(_L("Mixed filaments contain incompatible material types. Please correct the mixed filaments settings before slicing.")));
+            into_u8(_L("A mixed filament combines filaments of different material types (for example PLA with PETG), "
+                       "which don't bond and don't print at the same temperature. Change its component filaments to "
+                       "the same material type before slicing.")));
     } else {
         notification_manager->close_notification_of_type(NotificationType::FilamentIncompatibleMixed);
     }
@@ -22964,7 +22977,9 @@ void Plater::notify_vhl_dithering_conflict(bool local_z_enabled)
         return;
 
     MessageDialog dialog(this,
-        _L("Cannot enable both Variable Layer Height and Subdivide Mix Layer."),
+        _L("Variable layer height and Subdivide Mix Layer can't be used together: both change the layer heights, so "
+           "the result would be unpredictable. Turn off Subdivide Mix Layer in the process settings, or reset the "
+           "objects' variable layer height with the Variable Layer Height tool."),
         _L("Warning"), wxICON_WARNING | wxOK);
     dialog.ShowModal();
 }
@@ -24250,7 +24265,9 @@ void Plater::import_model_id(wxString download_info)
             unused_filename.clear();
         }
         if (unused_filename.empty()) {
-            msg = _L("Importing to Snapmaker Orca failed. Please download the file and manually import it.");
+            msg = _L("The model could not be added to the project: it could not be downloaded or saved in the app's "
+                     "download folder (no internet connection, a full disk, or a folder the app may not write to). "
+                     "Download the file with your browser and open it with File > Import.");
             return;
         }
         filename = from_u8(unused_filename);
@@ -24310,7 +24327,10 @@ void Plater::import_model_id(wxString download_info)
                         error);
 
                     if (retry_count == max_retries) {
-                        msg = _L("Importing to Snapmaker Orca failed. Please download the file and manually import it.");
+                        msg = _L("The model could not be added to the project: it could not be downloaded or saved "
+                                 "in the app's download folder (no internet connection, a full disk, or a folder the "
+                                 "app may not write to). Download the file with your browser and open it with File > "
+                                 "Import.");
                         cont = false;
                     }
                 })
@@ -24333,7 +24353,10 @@ void Plater::import_model_id(wxString download_info)
                         }
                         boost::system::error_code ec;
                         fs::remove(tmp_path, ec);
-                        msg = _L("Importing to Snapmaker Orca failed. Please download the file and manually import it.");
+                        msg = _L("The model could not be added to the project: it could not be downloaded or saved "
+                                 "in the app's download folder (no internet connection, a full disk, or a folder the "
+                                 "app may not write to). Download the file with your browser and open it with File > "
+                                 "Import.");
                 }).perform_sync();
 
                 // for break while
@@ -25581,7 +25604,7 @@ void Plater::load_gcode(const wxString& filename)
         BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": file does not exist: " << filename;
         MessageDialog(this,
             _L("The selected file") + ":\n" + filename + "\n" + _L("does not exist. It may have been moved, renamed or deleted, or it was on a drive that is no longer connected."),
-            wxString(GCODEVIEWER_APP_NAME) + " - " + _L("Error occurs while loading G-code file"),
+            wxString(GCODEVIEWER_APP_NAME) + " - " + _L("The G-code file could not be opened"),
             wxCLOSE | wxICON_WARNING | wxCENTRE).ShowModal();
         return;
     }
@@ -25663,7 +25686,7 @@ void Plater::load_gcode(const wxString& filename)
         MessageDialog(this, _L("The selected file") + ":\n" + filename + "\n" +
                                 _L("Does not contain valid G-code: it holds no printable layers. It may be empty, cut short by "
                                    "an interrupted export or transfer, or not a G-code file at all. Slice and export it again."),
-            wxString(GCODEVIEWER_APP_NAME) + " - " + _L("An Error has occurred while loading the G-code file."), wxCLOSE | wxICON_WARNING | wxCENTRE).ShowModal();
+            wxString(GCODEVIEWER_APP_NAME) + " - " + _L("The G-code file could not be opened"), wxCLOSE | wxICON_WARNING | wxCENTRE).ShowModal();
         set_project_filename(DEFAULT_PROJECT_NAME);
     } else {
         set_project_filename(filename);
@@ -26886,7 +26909,8 @@ void Plater::export_gcode(bool prefer_removable)
             output_path = into_path(dlg.GetPath());
             while (has_illegal_filename_characters(output_path.filename().string())) {
                 show_error(this, _L("The provided file name is not valid.") + "\n" +
-                    _L("The following characters are not allowed by a FAT file system:") + " <>:/\\|?*\"");
+                    _L("It contains characters that USB drives and SD cards (FAT file system) don't allow, so the "
+                       "printer could not read the file. Remove these characters:") + " <>:/\\|?*\"");
                 dlg.SetFilename(from_path(output_path.filename()));
                 if (dlg.ShowModal() == wxID_OK)
                     output_path = into_path(dlg.GetPath());
@@ -27995,7 +28019,9 @@ bool Plater::reslice()
         p->notification_manager->push_notification(
             NotificationType::FilamentIncompatibleMixed,
             NotificationManager::NotificationLevel::ErrorNotificationLevel,
-            into_u8(_L("Mixed filaments contain incompatible material types. Please correct the mixed filaments settings before slicing.")));
+            into_u8(_L("A mixed filament combines filaments of different material types (for example PLA with PETG), "
+                       "which don't bond and don't print at the same temperature. Change its component filaments to "
+                       "the same material type before slicing.")));
         reset_gcode_toolpaths();
         return true;
     }
@@ -28259,7 +28285,9 @@ int Plater::start_next_slice()
         p->notification_manager->push_notification(
             NotificationType::FilamentIncompatibleMixed,
             NotificationManager::NotificationLevel::ErrorNotificationLevel,
-            into_u8(_L("Mixed filaments contain incompatible material types. Please correct the mixed filaments settings before slicing.")));
+            into_u8(_L("A mixed filament combines filaments of different material types (for example PLA with PETG), "
+                       "which don't bond and don't print at the same temperature. Change its component filaments to "
+                       "the same material type before slicing.")));
 
         return -1;
     }
@@ -31109,8 +31137,10 @@ void Plater::validate_current_plate(bool& model_fits, bool& validate_error)
     model_fits = p->view3D->get_canvas3d()->check_volumes_outside_state() != ModelInstancePVS_Partly_Outside;
     validate_error = false;
     if (p->printer_technology == ptFFF) {
-        std::string plater_text = _u8L("An object is laid over the boundary of plate or exceeds the height limit.\n"
-                    "Please solve the problem by moving it totally on or off the plate, and confirming that the height is within the build volume.");;
+        std::string plater_text = _u8L("An object sticks out over the edge of the plate or is taller than the "
+                                       "printer can print.\nMove it completely onto the plate (or completely off it, "
+                                       "to leave it out of the print), and scale it down if it is taller than the "
+                                       "build volume.");;
         std::vector<StringObjectException> warnings;
         Polygons polygons;
         std::vector<std::pair<Polygon, float>> height_polygons;
@@ -31963,7 +31993,9 @@ bool Plater::PopupObjectTable(int object_id, int volume_id, const wxPoint& posit
     // mixed-filament columns are made for the U1.
     const TabPrinter* printer_tab = dynamic_cast<TabPrinter*>(wxGetApp().get_tab(Preset::TYPE_PRINTER));
     if (printer_tab != nullptr && printer_tab->m_extruders_count > 1) {
-        MessageDialog dlg(this, _L("Currently, the object configuration form cannot be used with a multiple-extruder printer."),
+        MessageDialog dlg(this, _L("On a printer with several tool heads, the speed columns of this table change the "
+                                   "speeds of the first tool head only. Click OK to open it anyway, or Cancel and "
+                                   "change the speeds in the process settings instead."),
                           _L("Not available"), wxOK | wxCANCEL | wxICON_WARNING);
         if (dlg.ShowModal() == wxID_CANCEL)
             return false;
@@ -32281,7 +32313,8 @@ bool Plater::refresh_missing_plugin_block(bool* block_toggled)
     // local plugin by installing it or by changing the setting that needs it.
     update(NotificationType::OrcaLocalPluginMissingError, missing_local,
            &p->m_local_missing_shown_sig,
-           _u8L("Local plugins required by the current preset are missing:"),
+           _u8L("The current preset needs plugins that are not installed, so it can't slice. Install them, or change "
+                "the settings that use them:"),
            _u8L("Find plugins online"),
            [missing_local_refs](wxEvtHandler*) { open_missing_plugins_on_cloud(missing_local_refs); return false; });
 
