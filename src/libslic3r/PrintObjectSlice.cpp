@@ -828,7 +828,8 @@ std::string fix_slicing_errors(PrintObject* object, LayerPtrs &layers, const std
 
     //BBS
     if(error_msg.empty() && !buggy_layers.empty())
-        error_msg = L("The model has too many empty layers.");
+        error_msg = L("The model has too many empty layers: parts of it float or are too thin to slice. Repair it "
+                      "(right-click, Fix Model), and check that it is in millimetres and not scaled too small.");
 
     // BBS: first layer slices are sorted by volume group, if the first layer is empty and replaced by the 2nd layer
 // the later will be stored in "object->firstLayerObjGroupsMod()"
@@ -917,7 +918,9 @@ void PrintObject::slice()
             }
         });
     if (m_layers.empty())
-        throw Slic3r::SlicingError(L("No layers were detected. You might want to repair your STL file(s) or check their size or thickness and retry.\n"));
+        throw Slic3r::SlicingError(L("No layers were detected: the object is empty, flat, or too thin or small to "
+                                     "slice. Repair it (right-click, Fix Model), check that it is in millimetres and "
+                                     "not scaled too small, and slice again.\n"));
 
     // BBS
     this->set_done(posSlice);

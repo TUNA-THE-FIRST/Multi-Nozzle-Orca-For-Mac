@@ -2582,7 +2582,9 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
                layers_to_print.front().object_layer != nullptr && !layers_to_print.front().object_layer->lslices.empty())
             layers_to_print.erase(layers_to_print.begin());
         if (layers_to_print.empty() || !has_extrusions_to_print(layers_to_print.front()))
-            throw Slic3r::SlicingError(_(L("One object has an empty first layer and can't be printed. Please Cut the bottom or enable supports.")), object.id().id);
+            throw Slic3r::SlicingError(_(L("One object has an empty first layer and can't be printed: nothing of it "
+                                           "touches the bed. Lower it onto the bed (Drop to Bed), cut off its "
+                                           "bottom, or enable supports.")), object.id().id);
     }
 
     if (!warning_ranges.empty()) {
@@ -2592,7 +2594,8 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
             warning += Slic3r::format(_(L("The object has empty layers between %1% and %2% and can\u2019t be printed.")),
                                       warning_ranges[i].first, warning_ranges[i].second) + "\n";
         warning += Slic3r::format(_(L("Object: %1%")), object.model_object()->name) + "\n"
-            + _(L("Parts of the object at these heights may be too thin or the object may have a faulty mesh."));
+            + _(L("Parts of the object at these heights may be too thin or the object may have a faulty mesh. Repair "
+                  "it (right-click, Fix Model), make the thin parts thicker, or enable supports."));
 
         const_cast<Print*>(object.print())
             ->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL, warning, PrintStateBase::SlicingEmptyGcodeLayers);
@@ -3500,7 +3503,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream& file, ThumbnailsGenerato
         }
         if (initial_extruder_id == static_cast<unsigned int>(-1))
             // No object to print was found, cancel the G-code export.
-            throw Slic3r::SlicingError(_(L("No object can be printed. It may be too small.")));
+            throw Slic3r::SlicingError(_(L("No object can be printed: every object is too small or too thin to give "
+                                           "a layer. Check that the objects are in millimetres (scale them up if "
+                                           "they were made in meters or inches) and slice again.")));
         // We don't allow switching of extruders per layer by Model::custom_gcode_per_print_z in sequential mode.
         // Use the extruder IDs collected from Regions.
         this->set_extruders(print.extruders());
@@ -3537,7 +3542,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream& file, ThumbnailsGenerato
                         max_additional_fan = temp_max_additional_fan;
         if (tool_ordering.all_extruders().empty())
             // No object to print was found, cancel the G-code export.
-            throw Slic3r::SlicingError(_(L("No object can be printed. It may be too small.")));
+            throw Slic3r::SlicingError(_(L("No object can be printed: every object is too small or too thin to give "
+                                           "a layer. Check that the objects are in millimetres (scale them up if "
+                                           "they were made in meters or inches) and slice again.")));
         has_wipe_tower = print.has_wipe_tower() && tool_ordering.has_wipe_tower();
         // Orca: support all extruder priming
         initial_extruder_id = (wipe_tower_type == WipeTowerType::Type2 && has_wipe_tower && !print.config().single_extruder_multi_material_priming) ?
@@ -4473,8 +4480,10 @@ void GCode::_do_export(Print& print, GCodeOutputStream& file, ThumbnailsGenerato
                         // This is not Marlin, M1 command is probably not supported.
                         if (overlap) {
                             print.active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                                                          _(L("Your print is very close to the priming regions. "
-                                                              "Make sure there is no collision.")));
+                                                          _(L("Your print is very close to where the printer primes "
+                                                              "the nozzles at the start, so the nozzle may hit it. "
+                                                              "Move the objects away from the edge of the plate and "
+                                                              "check the preview.")));
                         } else {
                             // Just continue printing, no action necessary.
                         }
@@ -4736,10 +4745,12 @@ void GCode::check_placeholder_parser_failed()
 {
     if (!m_placeholder_parser_integration.failed_templates.empty()) {
         // G-code export proceeded, but some of the PlaceholderParser substitutions failed.
-        std::string msg = Slic3r::format(_(L("Failed to generate G-code for invalid custom G-code.\n\n")));
+        std::string msg = Slic3r::format(_(L("The G-code could not be finished because a custom G-code template has "
+                                             "an error:\n\n")));
         for (const auto& name_and_error : m_placeholder_parser_integration.failed_templates)
             msg += name_and_error.first + " " + name_and_error.second + "\n";
-        msg += Slic3r::format(_(L("Please check the custom G-code or use the default custom G-code.")));
+        msg += Slic3r::format(_(L("Fix the template named above in the printer or filament settings, or restore its "
+                                  "default with the reset arrow next to it.")));
         throw Slic3r::PlaceholderParserError(msg);
     }
 }
@@ -9402,7 +9413,9 @@ void GCode::append_full_config(const Print& print, std::string& str)
         } else if (filament_count_tmp == 1) {
         } // Not applicable to flush matrix situations
         else { // flush_volumes_matrix value count error?
-            throw Slic3r::SlicingError(_(L("Flush volumes matrix do not match to the correct size!")));
+            throw Slic3r::SlicingError(_(L("The flushing volumes table doesn't match the number of filaments, "
+                                           "usually after filaments were added or removed. Open Flushing volumes in "
+                                           "the sidebar, check the values and click OK, then slice again.")));
         }
     }
     // filament_map_2 (the per-filament (extruder x volume-type) slot map) is computed during apply /

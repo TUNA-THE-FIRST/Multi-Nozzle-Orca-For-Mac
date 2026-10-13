@@ -33,7 +33,8 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
     ObjParser::MtlData mtl_data;
     if (! ObjParser::objparse(path, data)) {
         BOOST_LOG_TRIVIAL(error) << "load_obj: failed to parse " << path;
-        message = _L("load_obj: failed to parse");
+        message = _L("The OBJ file could not be read: it is damaged or not a valid OBJ file. Export it again from "
+                     "your design app.");
         return false;
     }
     bool exist_mtl = false;
@@ -60,7 +61,9 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
             if (boost::filesystem::exists(mtl_name_is_path ? mtl_abs_path : mtl_path)) {
                 if (!ObjParser::mtlparse(_mtl_path.c_str(), mtl_data)) {
                     BOOST_LOG_TRIVIAL(error) << "load_obj:load_mtl: failed to parse " << _mtl_path;
-                    message = _L("load mtl in obj: failed to parse");
+                    message = _L("The colours of the OBJ file (its .mtl file) could not be read: the .mtl file is "
+                                 "damaged. Export the model again, or remove the .mtl file to load the model without "
+                                 "colours.");
                     return false;
                 }
             }
@@ -80,12 +83,15 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
             if (num_face_vertices > 4) {
                 // Non-triangular and non-quad faces are not supported as of now.
                 BOOST_LOG_TRIVIAL(error) << "load_obj: failed to parse " << path << ". The file contains polygons with more than 4 vertices.";
-                message = _L("The file contains polygons with more than 4 vertices.");
+                message = _L("The file contains faces with more than 4 corners, but only triangles and quads can be "
+                             "read. Export it again with triangulated faces (most design apps have a Triangulate "
+                             "option).");
                 return false;
             } else if (num_face_vertices < 3) {
                 // Non-triangular and non-quad faces are not supported as of now.
                 BOOST_LOG_TRIVIAL(error) << "load_obj: failed to parse " << path << ". The file contains polygons with less than 2 vertices.";
-                message = _L("The file contains polygons with less than 2 vertices.");
+                message = _L("The file contains damaged faces with fewer than 2 corners. Export it again from your "
+                             "design app.");
                 return false;
             }
             if (num_face_vertices == 4)
@@ -128,7 +134,8 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
                     assert(cnt < OBJ_VERTEX_LENGTH);
                     if (vertex.coordIdx < 0 || vertex.coordIdx >= int(its.vertices.size())) {
                         BOOST_LOG_TRIVIAL(error) << "load_obj: failed to parse " << path << ". The file contains invalid vertex index.";
-                        message = _L("The file contains invalid vertex index.");
+                        message = _L("The file contains faces that point to corners that don't exist: the mesh is "
+                                     "damaged. Export it again from your design app.");
                         return false;
                     }
                     indices[cnt] = vertex.coordIdx;
@@ -214,7 +221,8 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
     *meshptr = TriangleMesh(std::move(its));
     if (meshptr->empty()) {
         BOOST_LOG_TRIVIAL(error) << "load_obj: This OBJ file couldn't be read because it's empty. " << path;
-        message = _L("This OBJ file couldn't be read because it's empty.");
+        message = _L("This OBJ file couldn't be read because it's empty: the download or export was probably "
+                     "interrupted. Export or download it again.");
         return false;
     }
     if (meshptr->volume() < 0) {
