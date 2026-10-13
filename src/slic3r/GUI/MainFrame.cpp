@@ -1,4 +1,5 @@
 #include "MainFrame.hpp"
+#include "MultiNozzle.hpp"
 
 #include <wx/panel.h>
 #include <wx/textentry.h>
@@ -2930,6 +2931,14 @@ wxMenu* MainFrame::generate_help_menu()
         if (canvas)
             canvas->set_as_dirty();
         });
+
+    // Snapmaker Orca Mac: printing one object with several nozzle sizes and layer heights.
+    append_menu_item(helpMenu, wxID_ANY, _L("Multi-nozzle Printing Guide"),
+                     _L("How to print one object with several nozzle sizes and layer heights"),
+                     [](wxCommandEvent &) { open_multi_nozzle_guide(); });
+    append_menu_item(helpMenu, wxID_ANY, _L("Set Up Multi-nozzle Printing") + dots,
+                     _L("Choose each nozzle's size and layer height and what it prints"),
+                     [](wxCommandEvent &) { open_multi_nozzle_setup(); });
 
     // Report a bug
     //append_menu_item(helpMenu, wxID_ANY, _L("Report Bug(TODO)"), _L("Report a bug of Snapmaker Orca"),

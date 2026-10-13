@@ -73,6 +73,10 @@ Slic3r::Model model(const std::string& model_name, TriangleMesh&& _mesh);
 DynamicPrintConfig multifilament_config(unsigned int filaments,
     std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> extra = {});
 
+// The config init_print() applies: full_print_config() with `config_in` on top, G-code comments on,
+// and the per-extruder and per-filament columns a raw multi-extruder config lacks synthesized.
+DynamicPrintConfig init_print_config(const DynamicPrintConfig &config_in);
+
 // Apply `meshes` and config to `print`/`model`; optional per-object overrides, auto-arranged unless `arrange` is false.
 void init_print(std::vector<TriangleMesh> &&meshes, Slic3r::Print &print, Slic3r::Model &model, const DynamicPrintConfig &config_in,
     const std::vector<std::vector<Slic3r::ConfigBase::SetDeserializeItem>> *per_object_overrides = nullptr, bool arrange = true);

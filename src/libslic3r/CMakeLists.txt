@@ -486,6 +486,8 @@ set(lisbslic3r_sources
     SlicingAdaptive.hpp
     Slicing.cpp
     Slicing.hpp
+    ToolHeadUse.cpp
+    ToolHeadUse.hpp
     Support/SupportCommon.cpp
     Support/SupportCommon.hpp
     Support/SupportLayer.hpp

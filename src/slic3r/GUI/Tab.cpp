@@ -5,6 +5,7 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/PerHeadProcess.hpp"
+#include "libslic3r/ToolHeadUse.hpp"
 #include "libslic3r/Slicing.hpp"
 #include "libslic3r/FilamentFlowColumns.hpp"
 #include "libslic3r/PrintConfig.hpp"
@@ -1731,6 +1732,9 @@ void Tab::update_mode()
 {
     m_mode = wxGetApp().get_mode();
 
+    // Lines whose visibility depends on the mode as well (TabPrint::toggle_options).
+    if (m_type == Preset::TYPE_PRINT && m_active_page != nullptr)
+        toggle_options();
     update_visibility();
 
     update_changed_tree_ui();
@@ -4757,6 +4761,15 @@ void TabPrint::toggle_options()
                     toggle_option(key, false, index + 256);
             }
     }
+
+    // Snapmaker Orca Mac: which nozzle prints which feature shows in Simple mode too on a printer with
+    // several nozzles, where it is how one object prints with several nozzle sizes; on a single-nozzle
+    // printer it stays an Advanced setting, as it was.
+    const auto *nozzles = m_preset_bundle != nullptr ?
+                              m_preset_bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("nozzle_diameter") : nullptr;
+    const bool  show_features = m_mode >= comAdvanced || (nozzles != nullptr && nozzles->values.size() > 1);
+    for (const ToolHeadFeature &feature : tool_head_features())
+        toggle_line(feature.key, show_features);
 }
 
 void TabPrint::update()
