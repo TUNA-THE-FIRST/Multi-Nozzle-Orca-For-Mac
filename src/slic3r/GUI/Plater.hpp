@@ -255,6 +255,12 @@ public:
     void update_nozzle_layer_height_hints();
     // Refresh the nozzle tabs' combo values in place; rebuilds (deferred) on extruder count change.
     void update_nozzle_values();
+    // Snapmaker Orca Mac: the "What each nozzle prints" summary under the nozzle tabs (multi-nozzle
+    // printers only): each tool head's nozzle, the layer height it prints and the features it prints
+    // on the current plate. Refreshed after every apply of the plate; coalesced to one per idle.
+    void update_multi_nozzle_summary();
+    // Stores tool head `head`'s preferred layer height (0 = Default) in the edited printer preset.
+    bool set_preferred_layer_height(size_t head, double height);
     // Refresh the Flow row of the nozzle tabs: which types a tool head offers, whether it may be
     // changed, and the selected type (project config "nozzle_volume_type").
     void update_nozzle_flow_values();

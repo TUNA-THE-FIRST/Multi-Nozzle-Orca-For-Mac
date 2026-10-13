@@ -7,6 +7,13 @@ LixNix's 2.5 line with per-extruder layer heights for printers whose tool heads 
 It is not made or supported by Snapmaker. Report problems with this build in this repository's
 [issues](../../issues), not to Snapmaker support.
 
+## Multi-nozzle printing
+
+Print one object with several nozzle sizes and layer heights - a fine nozzle for the outside, a large one with thick
+layers for the inside. Read the [multi-nozzle printing guide](resources/guides/multi_nozzle.md) (also under
+**Help > Multi-nozzle Printing Guide** in the app), or click **Set up multi-nozzle printing...** under the nozzle tabs
+in the sidebar to start from a recipe.
+
 ## Download
 
 Every change to `main` is built on GitHub's Apple Silicon Macs:

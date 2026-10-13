@@ -118,6 +118,7 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/NozzleFilamentPresets.hpp"
 #include "libslic3r/PerHeadProcess.hpp"
+#include "libslic3r/ToolHeadUse.hpp"
 #include "libslic3r/FilamentFlowColumns.hpp"
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/ProjectSchemaVersion.hpp"
@@ -144,6 +145,7 @@
 #include "wxExtensions.hpp"
 #include "../Utils/PrintHost.hpp"
 #include "MainFrame.hpp"
+#include "MultiNozzle.hpp"
 #ifdef SLIC3R_CAD
 #include "slic3r/GUI/CAD/DesignPanel.hpp"
 #endif
@@ -1941,6 +1943,9 @@ struct Sidebar::priv
     std::vector<NozzlePage>      m_nozzle_pages;
     std::vector<ComboBox*>       m_nozzle_layer_height_lists;
     bool                         m_nozzle_rebuild_scheduled{false};
+    // Snapmaker Orca Mac: "What each nozzle prints" under the nozzle tabs (update_multi_nozzle_summary).
+    StaticBox*                   m_nozzle_summary{nullptr};
+    bool                         m_nozzle_summary_scheduled{false};
     // Sizes the nozzle block for its strip and its tallest page.
     void                         fit_nozzle_block();
 
@@ -4579,6 +4584,14 @@ Sidebar::Sidebar(Plater *parent)
 
         // 添加到主布局
         vsizer_printer->Add(nozzle_container, 0, wxEXPAND | wxALL, FromDIP(4));
+
+        // Snapmaker Orca Mac: what each nozzle prints, filled by update_multi_nozzle_summary().
+        p->m_nozzle_summary = new StaticBox(p->m_panel_printer_content, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                                            wxTAB_TRAVERSAL | wxBORDER_NONE);
+        p->m_nozzle_summary->SetCornerRadius(8);
+        p->m_nozzle_summary->SetSizer(new wxBoxSizer(wxVERTICAL));
+        p->m_nozzle_summary->Hide();
+        vsizer_printer->Add(p->m_nozzle_summary, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(4));
 
         // Initialize nozzle settings
         update_nozzle_settings();
@@ -11606,6 +11619,90 @@ void Sidebar::update_nozzle_layer_height_hints()
         p->fit_nozzle_block();
 }
 
+bool Sidebar::set_preferred_layer_height(size_t head, double height)
+{
+    return store_preferred_layer_height(head, height);
+}
+
+void Sidebar::update_multi_nozzle_summary()
+{
+    if (p->m_nozzle_summary == nullptr || wxGetApp().preset_bundle == nullptr)
+        return;
+    // Every apply calls this; build once per idle.
+    if (p->m_nozzle_summary_scheduled)
+        return;
+    p->m_nozzle_summary_scheduled = true;
+    wxGetApp().CallAfter([this]() {
+        p->m_nozzle_summary_scheduled = false;
+        StaticBox *box = p->m_nozzle_summary;
+        if (box == nullptr || wxGetApp().preset_bundle == nullptr)
+            return;
+        // What the engine will print, read from the plate's print as the last apply left it.
+        const ToolHeadUses uses       = plate_tool_head_uses();
+        const auto        *min_option = wxGetApp().preset_bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("min_layer_height");
+
+        wxWindowUpdateLocker no_updates(box);
+        box->DestroyChildren();
+        wxSizer *sizer = box->GetSizer();
+        sizer->Clear(false);
+        const bool shown = uses.heads.size() > 1;
+        if (shown) {
+            auto add_text = [box, sizer](const wxString &text, const wxFont &font, const wxColour &colour, int top) {
+                auto *label = new ogStaticText(box, text, wxST_NO_AUTORESIZE);
+                label->SetFont(font);
+                label->SetBackgroundColour(*wxWHITE);
+                label->SetForegroundColour(colour);
+                wxGetApp().UpdateDarkUI(label);
+                label->WrapToWidth([box]() { box->GetParent()->Layout(); });
+                sizer->Add(label, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, box->FromDIP(top));
+                return label;
+            };
+            const wxColour text_colour = StateColor::darkModeColorFor(wxColour("#262E30"));
+            const wxColour grey        = StateColor::darkModeColorFor(wxColour("#6B6B6B"));
+            const wxColour warning     = wxColour("#FF6F00");
+            const wxString dot         = wxString::FromUTF8(u8" \u00B7 ");
+            add_text(_L("What each nozzle prints on this plate"), Label::Head_13, text_colour, 8);
+            for (size_t i = 0; i < uses.heads.size(); ++i) {
+                const ToolHeadUse &use  = uses.heads[i];
+                const wxString     name = nozzle_display_name(i, uses.heads.size());
+                const wxString     size = format_wxstr(_L("%1% mm"), mm_number(use.nozzle));
+                if (use.features.empty()) {
+                    add_text(name + dot + size + dot + _L("not used on this plate"), Label::Body_13, grey, 6);
+                    continue;
+                }
+                add_text(name + dot + size, Label::Body_13, text_colour, 6);
+                for (const wxString &line : tool_head_print_lines(use, uses.grid))
+                    add_text(line, Label::Body_12, grey, 2);
+            }
+            for (const wxString &text : tool_head_warnings(uses, min_option != nullptr ? min_option->values : std::vector<double>{}))
+                add_text(text, Label::Body_12, warning, 6);
+            auto *setup = new wxStaticText(box, wxID_ANY, _L("Set up multi-nozzle printing") + dots);
+            setup->SetFont(Label::Body_13);
+            setup->SetForegroundColour(wxColour("#009688"));
+            setup->SetCursor(wxCursor(wxCURSOR_HAND));
+            setup->SetToolTip(_L("Choose the nozzle size and layer height of each nozzle and which parts of the objects each one "
+                                 "prints, or start from a ready-made recipe."));
+            setup->Bind(wxEVT_LEFT_DOWN, [](wxMouseEvent &) { wxGetApp().CallAfter([]() { open_multi_nozzle_setup(); }); });
+            auto *guide = new wxStaticText(box, wxID_ANY, _L("How multi-nozzle printing works"));
+            guide->SetFont(Label::Body_13);
+            guide->SetForegroundColour(wxColour("#009688"));
+            guide->SetCursor(wxCursor(wxCURSOR_HAND));
+            guide->Bind(wxEVT_LEFT_DOWN, [](wxMouseEvent &) { wxGetApp().CallAfter([]() { open_multi_nozzle_guide(); }); });
+            for (wxStaticText *link : {setup, guide}) {
+                link->SetBackgroundColour(*wxWHITE);
+                wxGetApp().UpdateDarkUI(link);
+            }
+            sizer->Add(setup, 0, wxLEFT | wxRIGHT | wxTOP, box->FromDIP(8));
+            sizer->Add(guide, 0, wxALL, box->FromDIP(8));
+        }
+        if (box->IsShown() != shown)
+            box->Show(shown);
+        box->Layout();
+        if (p->scrolled != nullptr)
+            p->scrolled->Layout();
+    });
+}
+
 // Snapmaker Orca: sets one tool head's nozzle volume type like the Flow row and the sanitizer:
 // via TabPrinter::set_extruder_volume_type() (project config, remembered choice, settings tabs),
 // then the plates' per-filament volume choices. The printer preset is not modified.
@@ -12219,6 +12316,7 @@ void Sidebar::update_nozzle_settings(bool switch_machine)
     update_nozzle_layer_height_hints();
     // Fills the Flow rows and sizes the notebook for them (it lays the notebook out).
     update_nozzle_flow_values();
+    update_multi_nozzle_summary();
 
     if (switch_machine) {
         p->combo_printer->SetFocus();
@@ -12263,6 +12361,7 @@ void Sidebar::update_nozzle_values()
     update_nozzle_layer_height_hints();
     // A tool head may run High Flow only with a nozzle size the vendor data has values for.
     update_nozzle_flow_values();
+    update_multi_nozzle_summary();
 }
 
 // Snapmaker Orca: the nozzle tab hint names the process preset an extruder of another nozzle size
@@ -18911,8 +19010,10 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
         PerHeadProcess::record_sources(*preset_bundle);
         invalidated = background_process.apply(this->model, preset_bundle->full_config_for_print(false));
     }
-    if (sidebar != nullptr)
+    if (sidebar != nullptr) {
         sidebar->update_nozzle_process_hints();
+        sidebar->update_multi_nozzle_summary();
+    }
     notify_filament_compatibility_after_apply();
 
     if ((invalidated == Print::APPLY_STATUS_CHANGED) || (invalidated == Print::APPLY_STATUS_INVALIDATED))
