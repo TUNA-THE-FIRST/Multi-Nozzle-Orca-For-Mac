@@ -40,8 +40,9 @@ Printing...**), then:
 1. Choose a **recipe**:
    - **Fine outside, fast inside** - outer walls and top and bottom surfaces on the fine nozzle; inner walls and
      all infill on the coarse one. The best balance of looks and speed.
-   - **Fast infill** - only the sparse infill on the coarse nozzle. The safest start: the outside is untouched.
-   - **Smooth top** - only the top surfaces on the fine nozzle; good for draft-quality parts that need a nice top.
+   - **Fine walls, fast infill** - every wall and surface on the fine nozzle; solid and sparse infill on the coarse
+     one. Stronger walls, still much faster.
+   - **Fast sparse infill** - only the sparse infill on the coarse nozzle. The safest start: the outside is untouched.
    - **Off** - everything back to the object's own filament, one layer height.
 2. Check the **nozzle sizes** (they must match the printer) and the **layer height** of each nozzle. The list
    offers the heights that fit the object layer height.
@@ -49,7 +50,8 @@ Printing...**), then:
    about heights a nozzle cannot print well.
 4. Click **Apply**, then slice.
 
-The recipes treat the first nozzle as the fine one and the largest other nozzle as the coarse one.
+The recipes treat the first nozzle as the fine one and the largest other nozzle as the coarse one, and give **both**
+a layer height of their own (see *Not set* below for why that matters).
 
 ## Setting it up by hand
 
@@ -58,16 +60,17 @@ Everything the dialog does can be set directly:
 | What | Where |
 |---|---|
 | Nozzle size of each tool head | Sidebar, printer section, nozzle tabs: **Diameter** |
-| Layer height of each nozzle | Sidebar nozzle tabs: **Preferred layer height** (*Default* = the object layer height) |
+| Layer height of each nozzle | Sidebar nozzle tabs: **Preferred layer height** (*Default* = not set, see below) |
 | Which nozzle prints which feature | Process settings > **Multimaterial** > **Filament for Features**: outer walls, inner walls, sparse infill, internal solid infill, top surface, bottom surface |
 | A whole part on another nozzle | Object list: the part's **filament** column |
 | Supports | Process settings > **Support** > **Filament for Supports**, and **Support nozzle diameter** |
 
 A feature set to **Default** prints with the filament of the object or part it belongs to.
 
-Under the nozzle tabs, **What each nozzle prints on this plate** sums it up: each nozzle's size, the layer height
-it really prints, how often, and what it prints. A nozzle with a layer height set but nothing to print is
-flagged - its height does nothing until a feature or part uses its filament.
+Under the nozzle tabs, **What each nozzle prints on this plate** sums it up: each nozzle's size, and for each layer
+height it prints, how often and what. It is worked out by the same rules the slicer uses, so it shows what will
+really be printed. Orange notes explain anything that may go wrong: a layer too thick for its nozzle, a layer height
+a nozzle cannot print, or a layer height set on a nozzle that prints nothing.
 
 ## Checking the result
 
@@ -80,7 +83,11 @@ After slicing, in the preview:
 
 ## How the heights are worked out
 
-- A nozzle left at **Default** prints every object layer at the object layer height.
+- A nozzle left at **Default** (*Not set* in the setup dialog) has no layer height of its own: **it follows the
+  nozzle it shares a part with**. Each part prints with one layer pitch set by its walls, so if the coarse nozzle
+  prints the inner walls at 0.36 mm and the fine nozzle is left at Default, the fine nozzle's outer walls print
+  0.36 mm layers too - too thick for a 0.4 mm nozzle. Give the fine nozzle the object layer height (for example
+  0.12 mm) to keep it fine; the recipes always do.
 - A preferred height that is a whole multiple of the object layer height prints exactly as entered.
 - Otherwise the app looks for the coarsest object layer height on which every preferred height lands within
   0.01 mm of a whole multiple, and prints the heights rounded to it. The sidebar shows the height each nozzle
@@ -88,8 +95,11 @@ After slicing, in the preview:
 - **Exact preferred layer heights** (printer settings, or *Print exact heights* in the sidebar) instead keeps every
   height as entered, which can make the object layer height very fine (0.13 and 0.37 mm share only 0.01 mm) and
   slicing slow.
-- Where the geometry does not allow a coarse layer (a thin rib, the first layers, the top of a slope), that part
-  of the feature falls back to the object layer height.
+- Where the geometry does not allow a coarse layer (a thin rib, the first layers, the top of a slope, a band of
+  solid infill only a few layers thick), that part of the feature prints thinner layers, never thicker ones.
+- Only the walls, top surfaces, solid infill and sparse infill can print thicker on their own, and only in whole
+  multiples of the part's pitch. With 0.2 mm walls, a 0.3 mm sparse infill cannot be printed: it prints 0.2 mm
+  layers (the summary says so). Choose heights that are whole multiples of each other.
 
 ## Limits
 
@@ -109,6 +119,8 @@ After slicing, in the preview:
 | You see | Why | What to do |
 |---|---|---|
 | The coarse nozzle prints every layer | Nothing it prints can combine, or its height is Default | Give it a preferred layer height, and assign it a feature in Filament for Features |
+| The fine nozzle prints thick layers (orange note: *thicker than its nozzle prints well*) | Its layer height is Default, so it follows the coarse nozzle in the parts they share | Set its layer height to the object layer height, or use a recipe |
+| *... is set to X mm layers but prints Y mm layers* | Its height is not a whole multiple of the part's wall pitch | Choose heights that are whole multiples of each other |
 | *... is not on this plate's layer grid* (orange, sidebar) | Your heights share no common grid at the object layer height | Pick heights from the list, or click *Print exact heights* |
 | *The layer height of extruder N cannot exceed its nozzle diameter* | The height is thicker than the nozzle | Choose a lower height or a larger nozzle |
 | *Some object parts print ... mm layers with filament ... whose maximum layer height is ... mm* | That filament's nozzle prints thicker layers than its profile allows | Lower the height, or set the nozzle size in the sidebar so its profile's limits apply |
