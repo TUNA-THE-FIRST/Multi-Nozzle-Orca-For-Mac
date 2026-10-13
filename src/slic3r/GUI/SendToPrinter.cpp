@@ -46,11 +46,16 @@ wxDEFINE_EVENT(EVT_CLEAR_IPADDRESS, wxCommandEvent);
 
 static const std::map<int, std::string> error_messages = {
     {SendToPrinterDialog::ERROR_PIPE, L("Reconnecting the printer, the operation cannot be completed immediately, please try again later.")},
-    {SendToPrinterDialog::ERROR_RES_BUSY, L("The device cannot handle more conversations. Please retry later.")},
+    {SendToPrinterDialog::ERROR_RES_BUSY, L("The printer is already connected to too many apps (for example Bambu "
+                                            "Handy or another computer). Close the other connections, or wait a "
+                                            "minute, and try again.")},
     {SendToPrinterDialog::ERROR_TIME_OUT, L("Timeout, please try again.")},
     {SendToPrinterDialog::FILE_NO_EXIST, L("File does not exist.")},
-    {SendToPrinterDialog::FILE_CHECK_ERR, L("File checksum error. Please retry.")},
-    {SendToPrinterDialog::FILE_TYPE_ERR, L("Not supported on the current printer version.")},
+    {SendToPrinterDialog::FILE_CHECK_ERR, L("The file arrived damaged on the printer (its checksum doesn't match), "
+                                            "usually because the Wi-Fi connection dropped during the transfer. Send "
+                                            "it again.")},
+    {SendToPrinterDialog::FILE_TYPE_ERR, L("The printer's firmware is too old for this. Update the printer's "
+                                           "firmware and try again.")},
     {SendToPrinterDialog::STORAGE_UNAVAILABLE, L("Current firmware does not support file transfer to internal storage.")},
     {SendToPrinterDialog::API_VERSION_UNSUPPORT, L("The firmware version of the printer is too low. Please update the firmware and try again.")},
     {SendToPrinterDialog::FILE_EXIST, L("The file already exists, do you want to replace it?")},
@@ -192,7 +197,7 @@ void SendToPrinterDialog::on_rename_enter()
     }
 
     if (m_valid_type == Valid && new_file_name.size() >= 100) {
-        info_line    = _L("The name length exceeds the limit.");
+        info_line    = _L("The file name is too long for the printer. Shorten it and try again.");
         m_valid_type = NoValid;
     }
 
@@ -1388,7 +1393,8 @@ void SendToPrinterDialog::show_status(PrintDialogStatus status, std::vector<wxSt
         return;
 
     } else if (status == PrintDialogStatus::PrintStatusReconnecting) {
-        m_connecting_printer_msg->SetLabel(_L("Connection failed. Click the icon to retry"));
+        m_connecting_printer_msg->SetLabel(_L("The connection to the printer failed: it may be off, asleep or on "
+                                              "another network. Check it, then click the icon to retry."));
             update_print_status_msg(wxEmptyString, true, true);
             m_connecting_panel->Show();
             m_animaicon->Stop();
