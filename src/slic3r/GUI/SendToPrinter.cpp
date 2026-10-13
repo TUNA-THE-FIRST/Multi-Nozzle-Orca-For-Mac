@@ -1394,7 +1394,7 @@ void SendToPrinterDialog::show_status(PrintDialogStatus status, std::vector<wxSt
 
     } else if (status == PrintDialogStatus::PrintStatusReconnecting) {
         m_connecting_printer_msg->SetLabel(_L("The connection to the printer failed: it may be off, asleep or on "
-                                              "another network. Check it, then click the icon to retry."));
+                                              "another network.\nCheck it, then click the icon to retry."));
             update_print_status_msg(wxEmptyString, true, true);
             m_connecting_panel->Show();
             m_animaicon->Stop();

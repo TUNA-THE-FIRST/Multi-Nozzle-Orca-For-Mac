@@ -495,9 +495,8 @@ void MediaFilePanel::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
         return;
     }
     if (m_lan_mode) {
-        m_image_grid->SetStatus(m_bmp_failed, _L("The printer's files can't be browsed in LAN Only mode. Turn LAN "
-                                                 "Only mode off on the printer's screen, or take out the storage "
-                                                 "card and open it on your Mac."));
+        m_image_grid->SetStatus(m_bmp_failed, _L("The printer's files can't be browsed in LAN Only mode.\nTurn LAN Only mode off on the "
+                                                 "printer's screen,\nor take out the storage card and open it on your Mac."));
         fs->SetUrl("0");
         return;
     }
