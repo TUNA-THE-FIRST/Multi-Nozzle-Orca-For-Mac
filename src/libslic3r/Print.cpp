@@ -1934,11 +1934,7 @@ static StringObjectException layered_print_cleareance_valid(const Print &print, 
             volume_hull.translate(inst->shift - inst->print_object->center_offset());
 
             if (!intersection(exclude_polys, volume_hull).empty()) {
-                // return {inst->model_instance->get_object()->name + L(" is too close to exclusion area, there may "
-                                                                        "be collisions when printing. The exclusion "
-                                                                        "area is the part of the bed the printer "
-                                                                        "keeps clear (shaded on the plate); move it "
-                                                                        "out of that area.") + "\n",
+                // return {inst->model_instance->get_object()->name + L(" is too close to exclusion area, there may be collisions when printing.") + "\n",
                 //        inst->model_instance->get_object()};
                 //ORCA: Pass ModelInstance instead of ModelObject
                 return {inst->model_instance->get_object()->name + L(" is too close to exclusion area, there may be "
@@ -1950,11 +1946,7 @@ static StringObjectException layered_print_cleareance_valid(const Print &print, 
             }
 
             if (print_config.enable_wrapping_detection.value && !intersection(wrapping_poly, volume_hull).empty()) {
-                // return {inst->model_instance->get_object()->name + L(" is too close to clumping detection area, "
-                                                                        "there may be collisions when printing. The "
-                                                                        "printer checks that area for tangled "
-                                                                        "filament; move it out of the marked area on "
-                                                                        "the plate.") + "\n",
+                // return {inst->model_instance->get_object()->name + L(" is too close to clumping detection area, there may be collisions when printing.") + "\n",
                 //        inst->model_instance->get_object()};
                 //ORCA: Pass ModelInstance instead of ModelObject
                 return {inst->model_instance->get_object()->name + L(" is too close to clumping detection area, "
