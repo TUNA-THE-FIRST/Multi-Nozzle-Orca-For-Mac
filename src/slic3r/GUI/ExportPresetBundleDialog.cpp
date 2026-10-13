@@ -156,7 +156,8 @@ void ExportPresetBundleDialog::InitExportData()
         }
     }
     if (!temp_folder_exist) {
-        MessageDialog dlg(this, _L("Failed to create temporary folder, please try Export Configs again."),
+        MessageDialog dlg(this, _L("A temporary folder for the export could not be created: the disk may be full. "
+                                   "Free some space and export the configs again."),
                           wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES_NO | wxYES_DEFAULT | wxCENTRE);
         dlg.ShowModal();
         EndModal(wxCANCEL);
@@ -457,23 +458,31 @@ void ExportPresetBundleDialog::show_export_result(const ExportCase& export_case)
     MessageDialog* msg_dlg = nullptr;
     switch (export_case) {
     case ExportCase::INITIALIZE_FAIL:
-        msg_dlg = new MessageDialog(this, _L("initialize fail"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+        msg_dlg = new MessageDialog(this, _L("The export file could not be created in the chosen folder: the folder "
+                                             "may be read-only or the disk full. Choose another folder, for example "
+                                             "Documents, and export again."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                                     wxYES | wxYES_DEFAULT | wxCENTRE);
         break;
     case ExportCase::ADD_FILE_FAIL:
-        msg_dlg = new MessageDialog(this, _L("add file fail"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+        msg_dlg = new MessageDialog(this, _L("A preset could not be added to the export file: the disk may be full. "
+                                             "Free some space or choose another folder, and export again."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                                     wxYES | wxYES_DEFAULT | wxCENTRE);
         break;
     case ExportCase::ADD_BUNDLE_STRUCTURE_FAIL:
-        msg_dlg = new MessageDialog(this, _L("add bundle structure file fail"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+        msg_dlg = new MessageDialog(this, _L("The bundle's index could not be added to the export file: the disk may "
+                                             "be full. Free some space or choose another folder, and export again."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                                     wxYES | wxYES_DEFAULT | wxCENTRE);
         break;
     case ExportCase::FINALIZE_FAIL:
-        msg_dlg = new MessageDialog(this, _L("finalize fail"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+        msg_dlg = new MessageDialog(this, _L("The export file could not be finished: the disk may be full or the "
+                                             "folder was removed. Free some space or choose another folder, and "
+                                             "export again."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                                     wxYES | wxYES_DEFAULT | wxCENTRE);
         break;
     case ExportCase::OPEN_ZIP_WRITTEN_FILE:
-        msg_dlg = new MessageDialog(this, _L("open zip written fail"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+        msg_dlg = new MessageDialog(this, _L("The export file could not be written in the chosen folder: the folder "
+                                             "may be read-only or the disk full. Choose another folder, for example "
+                                             "Documents, and export again."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                                     wxYES | wxYES_DEFAULT | wxCENTRE);
         break;
     case ExportCase::EXPORT_SUCCESS:

@@ -2239,7 +2239,9 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
         }
         bool is_precise_z_height = m_config->option<ConfigOptionBool>("precise_z_height")->value;
         if (boost::any_cast<bool>(value) && is_precise_z_height) {
-            MessageDialog dlg(wxGetApp().plater(), _L("Enabling both precise Z height and the prime tower may cause slicing errors. Do you still want to enable?"),
+            MessageDialog dlg(wxGetApp().plater(), _L("Precise Z height fine-tunes the heights of an object's last "
+                                                      "few layers, which the prime tower can't follow, so slicing "
+                                                      "may fail. Enable the prime tower anyway?"),
                 _L("Warning"), wxICON_WARNING | wxYES | wxNO);
             if (dlg.ShowModal() == wxID_NO) {
                 DynamicPrintConfig new_conf = *m_config;
@@ -2292,7 +2294,9 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     if (opt_key == "precise_z_height") {
         bool wipe_tower_enabled = m_config->option<ConfigOptionBool>("enable_prime_tower")->value;
         if (boost::any_cast<bool>(value) && wipe_tower_enabled) {
-            MessageDialog dlg(wxGetApp().plater(), _L("Enabling both precise Z height and the prime tower may cause slicing errors. Do you still want to enable precise Z height?"),
+            MessageDialog dlg(wxGetApp().plater(), _L("Precise Z height fine-tunes the heights of an object's last "
+                                                      "few layers, which the prime tower can't follow, so slicing "
+                                                      "may fail. Enable precise Z height anyway?"),
                 _L("Warning"), wxICON_WARNING | wxYES | wxNO);
             if (dlg.ShowModal() == wxID_NO) {
                 DynamicPrintConfig new_conf = *m_config;
@@ -7107,7 +7111,9 @@ void TabPrinter::build_fff()
 
                         if (errors != enum_bitmask<ThumbnailError>()) {
                             // TRN: The first argument is the parameter's name; the second argument is its value.
-                            std::string error_str = format(_u8L("Invalid value provided for parameter %1%: %2%"), "thumbnails", val);
+                            std::string error_str = format(_u8L("The value of %1% can't be used: %2%. Enter a value "
+                                                                "within the limits the setting allows (its tooltip "
+                                                                "shows them)."), "thumbnails", val);
                             error_str += GCodeThumbnails::get_error_string(errors);
                             InfoDialog(parent(), _L("G-code flavor is switched"), from_u8(error_str)).ShowModal();
                         }

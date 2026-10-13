@@ -1009,7 +1009,9 @@ void TroubleshootDialog::RebuildSystemProfiles()
             }
             catch (const std::exception& e) {
                 BOOST_LOG_TRIVIAL(warning) << "Failed to delete system folder..." << e.what();
-                MessageDialog(this, _L("Failed to delete system folder..."),
+                MessageDialog(this, _L("The system profiles folder could not be deleted: a file in it may be open in "
+                                       "another app, or the folder is read-only. Quit other apps using it and try "
+                                       "again."),
                     wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Error"), wxOK | wxICON_WARNING | wxCENTRE
                 ).ShowModal();
             }
@@ -1022,7 +1024,7 @@ bool TroubleshootDialog::RestartApplication()
     wxString execPath = wxStandardPaths::Get().GetExecutablePath();
     if (execPath.IsEmpty()) {
         MessageDialog(this,
-            _L("Failed to determine executable path."),
+            _L("The app could not restart itself. Quit it and open it again."),
             wxString(SLIC3R_APP_FULL_NAME),
             wxICON_WARNING | wxOK
         ).ShowModal();
@@ -1043,7 +1045,7 @@ bool TroubleshootDialog::RestartApplication()
     STARTUPINFO         si = { sizeof(si) };
     PROCESS_INFORMATION pi = {};
     if (!CreateProcess(nullptr, cmdBuf.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
-        MessageDialog(this, _L("Failed to launch a new instance."), wxString(SLIC3R_APP_FULL_NAME), wxICON_WARNING | wxOK).ShowModal();
+        MessageDialog(this, _L("The app could not restart itself. Quit it and open it again."), wxString(SLIC3R_APP_FULL_NAME), wxICON_WARNING | wxOK).ShowModal();
         return false;
     }
     CloseHandle(pi.hProcess);
@@ -1054,7 +1056,7 @@ bool TroubleshootDialog::RestartApplication()
     long pid = wxExecute(cmd, wxEXEC_ASYNC);
     if (pid == 0) {
         MessageDialog(this,
-            _L("Failed to launch a new instance."),
+            _L("The app could not restart itself. Quit it and open it again."),
             wxString(SLIC3R_APP_FULL_NAME),
             wxICON_WARNING | wxOK
         ).ShowModal();

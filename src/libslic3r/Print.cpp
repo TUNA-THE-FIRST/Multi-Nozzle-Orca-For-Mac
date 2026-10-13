@@ -1249,13 +1249,24 @@ StringObjectException Print::sequential_print_clearance_valid(const Print &print
                 //juedge the exclude area
                 if (!intersection(exclude_polys, convex_hull_no_offset).empty()) {
                     if (single_object_exception.string.empty()) {
-                        single_object_exception.string = (boost::format(L("%1% is too close to exclusion area. There may be collisions when printing.")) %instance.model_instance->get_object()->name).str();
+                        single_object_exception.string = (boost::format(L("%1% is too close to exclusion area. There "
+                                                                          "may be collisions when printing. The "
+                                                                          "exclusion area is the part of the bed the "
+                                                                          "printer keeps clear (shaded on the "
+                                                                          "plate); move the object out of it, or use "
+                                                                          "Arrange.")) %instance.model_instance->get_object()->name).str();
                         // single_object_exception.object = instance.model_instance->get_object();
                         //ORCA: Pass ModelInstance instead of ModelObject
                         single_object_exception.object = instance.model_instance;
                     }
                     else {
-                        single_object_exception.string += "\n"+(boost::format(L("%1% is too close to exclusion area. There may be collisions when printing.")) %instance.model_instance->get_object()->name).str();
+                        single_object_exception.string += "\n"+(boost::format(L("%1% is too close to exclusion area. "
+                                                                                "There may be collisions when "
+                                                                                "printing. The exclusion area is the "
+                                                                                "part of the bed the printer keeps "
+                                                                                "clear (shaded on the plate); move "
+                                                                                "the object out of it, or use "
+                                                                                "Arrange.")) %instance.model_instance->get_object()->name).str();
                         single_object_exception.object = nullptr;
                     }
                     //if (polygons) {
@@ -1268,14 +1279,18 @@ StringObjectException Print::sequential_print_clearance_valid(const Print &print
                     if (! intersection(convex_hulls_other[i], convex_hull).empty()) {
                         bool has_exception = false;
                         if (single_object_exception.string.empty()) {
-                            single_object_exception.string = (boost::format(L("%1% is too close to others, and collisions may be caused.")) %instance.model_instance->get_object()->name).str();
+                            single_object_exception.string = (boost::format(L("%1% is too close to others, and collisions may be caused: printing one object at a time, the print "
+                                                                     "head could hit the objects already printed. Move the objects farther apart (Arrange "
+                                                                     "keeps the clearance needed), or set Print sequence to By layer.")) %instance.model_instance->get_object()->name).str();
                             // single_object_exception.object = instance.model_instance->get_object();
                             //ORCA: Pass ModelInstance instead of ModelObject for better selection
                             single_object_exception.object = instance.model_instance;
                             has_exception                  = true;
                         }
                         else {
-                            single_object_exception.string += "\n"+(boost::format(L("%1% is too close to others, and collisions may be caused.")) %instance.model_instance->get_object()->name).str();
+                            single_object_exception.string += "\n"+(boost::format(L("%1% is too close to others, and collisions may be caused: printing one object at a time, the print "
+                                                                     "head could hit the objects already printed. Move the objects farther apart (Arrange "
+                                                                     "keeps the clearance needed), or set Print sequence to By layer.")) %instance.model_instance->get_object()->name).str();
                             // single_object_exception.object = nullptr; 
                             // ORCA: Keep the first object so jump works
                             // has_exception                  = true;
@@ -1489,11 +1504,22 @@ StringObjectException Print::sequential_print_clearance_valid(const Print &print
             //return {, inst->model_instance->get_object()};
             for (auto& iter: too_tall_instances) {
                 if (single_object_exception.string.empty()) {
-                    single_object_exception.string = (boost::format(L("%1% is too tall, and collisions will be caused.")) %iter.first->model_instance->get_object()->name).str();
+                    single_object_exception.string = (boost::format(L("%1% is too tall, and collisions will be "
+                                                                      "caused: printing one object at a time, only "
+                                                                      "objects lower than the print head's clearance "
+                                                                      "height can be printed before the others. "
+                                                                      "Print it last, or set Print sequence to By "
+                                                                      "layer.")) %iter.first->model_instance->get_object()->name).str();
                     single_object_exception.object = iter.first->model_instance->get_object();
                 }
                 else {
-                    single_object_exception.string += "\n" + (boost::format(L("%1% is too tall, and collisions will be caused.")) %iter.first->model_instance->get_object()->name).str();
+                    single_object_exception.string += "\n" + (boost::format(L("%1% is too tall, and collisions will "
+                                                                              "be caused: printing one object at a "
+                                                                              "time, only objects lower than the "
+                                                                              "print head's clearance height can be "
+                                                                              "printed before the others. Print it "
+                                                                              "last, or set Print sequence to By "
+                                                                              "layer.")) %iter.first->model_instance->get_object()->name).str();
                     single_object_exception.object = nullptr;
                 }
                 if (height_polygons)
@@ -1911,7 +1937,11 @@ static StringObjectException layered_print_cleareance_valid(const Print &print, 
                 // return {inst->model_instance->get_object()->name + L(" is too close to exclusion area, there may be collisions when printing.") + "\n",
                 //        inst->model_instance->get_object()};
                 //ORCA: Pass ModelInstance instead of ModelObject
-                return {inst->model_instance->get_object()->name + L(" is too close to exclusion area, there may be collisions when printing.") + "\n",
+                return {inst->model_instance->get_object()->name + L(" is too close to exclusion area, there may be "
+                                                                     "collisions when printing. The exclusion area "
+                                                                     "is the part of the bed the printer keeps clear "
+                                                                     "(shaded on the plate); move it out of that "
+                                                                     "area.") + "\n",
                         inst->model_instance};
             }
 
@@ -1919,7 +1949,10 @@ static StringObjectException layered_print_cleareance_valid(const Print &print, 
                 // return {inst->model_instance->get_object()->name + L(" is too close to clumping detection area, there may be collisions when printing.") + "\n",
                 //        inst->model_instance->get_object()};
                 //ORCA: Pass ModelInstance instead of ModelObject
-                return {inst->model_instance->get_object()->name + L(" is too close to clumping detection area, there may be collisions when printing.") + "\n",
+                return {inst->model_instance->get_object()->name + L(" is too close to clumping detection area, "
+                                                                     "there may be collisions when printing. The "
+                                                                     "printer checks that area for tangled filament; "
+                                                                     "move it out of the marked area on the plate.") + "\n",
                         inst->model_instance};
             }
             current_instance_hulls.emplace_back(volume_hull);
@@ -1928,12 +1961,14 @@ static StringObjectException layered_print_cleareance_valid(const Print &print, 
         if (!intersection(convex_hulls_other, current_instance_hulls).empty()) {
             if (warning) {
                 if (warning->string.empty()) {
-                    warning->string = (boost::format(L("%1% is too close to others, and collisions may be caused.")) % inst->model_instance->get_object()->name).str();
+                    warning->string = (boost::format(L("%1% is too close to another object: their outlines overlap, so they may print fused together. "
+                                                   "Move them apart, or use Arrange.")) % inst->model_instance->get_object()->name).str();
                     // warning->object = inst->model_instance->get_object();
                     //ORCA: Pass ModelInstance instead of ModelObject for better selection
                     warning->object = inst->model_instance;
                 } else {
-                    warning->string += "\n" + (boost::format(L("%1% is too close to others, and collisions may be caused.")) % inst->model_instance->get_object()->name).str();
+                    warning->string += "\n" + (boost::format(L("%1% is too close to another object: their outlines overlap, so they may print fused together. "
+                                                   "Move them apart, or use Arrange.")) % inst->model_instance->get_object()->name).str();
                     // ORCA: Keep the first object so jump works
                     if (!warning->object) warning->object = inst->model_instance;
                 }
@@ -2004,20 +2039,28 @@ static StringObjectException layered_print_cleareance_valid(const Print &print, 
     // many setups that print fine.
     if (!intersection(convex_hulls_other, convex_hulls_temp).empty()) {
         if (warning) {
-            warning->string += L("Prime Tower") + L(" is too close to others, and collisions may be caused.\n");
+            warning->string += L("Prime Tower") + L(" is too close to an object, and collisions may be caused. Drag "
+                                                    "the prime tower (or the object) on the plate to give it more "
+                                                    "room.\n");
         }
     }
     if (!intersection(exclude_polys, tower_polys_checked).empty()) {
-        return {L("Prime Tower") + L(" is too close to an exclusion area, and collisions will be caused.\n")};
+        return {L("Prime Tower") + L(" is too close to an exclusion area, and collisions will be caused. Drag the "
+                                     "prime tower out of the shaded area on the plate.\n")};
     }
     if (print_config.enable_wrapping_detection.value && !intersection({wrapping_poly}, tower_polys_checked).empty()) {
-        return {L("Prime Tower") + L(" is too close to clumping detection area, and collisions will be caused.\n")};
+        return {L("Prime Tower") + L(" is too close to clumping detection area, and collisions will be caused. Drag "
+                                     "the prime tower out of the marked area on the plate.\n")};
     }
     if (warning && !intersection(exclude_polys, tower_polys_estimated).empty()) {
-        warning->string += L("Prime Tower") + L(" is too close to exclusion area, there may be collisions when printing.") + "\n";
+        warning->string += L("Prime Tower") + L(" is too close to exclusion area, there may be collisions when "
+                                                "printing. The exclusion area is the part of the bed the printer "
+                                                "keeps clear (shaded on the plate); move it out of that area.") + "\n";
     }
     if (warning && print_config.enable_wrapping_detection.value && !intersection({wrapping_poly}, tower_polys_estimated).empty()) {
-        warning->string += L("Prime Tower") + L(" is too close to clumping detection area, there may be collisions when printing.") + "\n";
+        warning->string += L("Prime Tower") + L(" is too close to clumping detection area, there may be collisions "
+                                                "when printing. The printer checks that area for tangled filament; "
+                                                "move it out of the marked area on the plate.") + "\n";
     }
     // No gate on "is there a tower": one that is not printed estimates to zero, so the hulls
     // are degenerate and every check passes. Re-deriving it here missed the wrapping-detection
@@ -2027,9 +2070,12 @@ static StringObjectException layered_print_cleareance_valid(const Print &print, 
     for (Polygon &p : printable_polys)
         p.translate(plate_shift);
     if (!diff(tower_polys_checked, printable_polys).empty())
-        return {L("Prime Tower") + L(" is partially outside the printable area, and it cannot be printed.\n")};
+        return {L("Prime Tower") + L(" is partially outside the printable area, and it cannot be printed. Drag it "
+                                     "fully onto the plate; a wider brim or more filaments make the tower larger.\n")};
     if (warning && !diff(tower_polys_estimated, printable_polys).empty())
-        warning->string += L("Prime Tower") + L(" is partially outside the printable area, and it cannot be printed.\n");
+        warning->string += L("Prime Tower") + L(" is partially outside the printable area, and it cannot be printed. "
+                                                "Drag it fully onto the plate; a wider brim or more filaments make "
+                                                "the tower larger.\n");
     return {};
 }
 
@@ -2284,7 +2330,9 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
         return {std::string()};
 
     if (extruders.empty())
-        return { L("No extrusions under current settings.") };
+        return { L("No extrusions under current settings. Nothing on the plate would be printed: the objects may "
+                   "have no walls, no top/bottom layers and no infill, or be thinner than one line. Check the wall "
+                   "loops, top/bottom shell layers and sparse infill density, or scale up very thin models.") };
 
     // Orca: a gradient mixed filament only renders its gradient with "Mixed color sublayer" on;
     // without it ToolOrdering::resolve_mixed_filaments prints one whole component per layer and
@@ -2310,11 +2358,14 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
     // is kept (still reachable from the GUI) but is intentionally not called from validate().
     if (m_config.print_sequence == PrintSequence::ByObject && (m_objects.size() > 1 || m_objects[0]->instances().size() > 1)) {
         if (m_config.timelapse_type == TimelapseType::tlSmooth)
-            return {L("Smooth mode of timelapse is not supported when \"by object\" sequence is enabled.")};
+            return {L("Smooth mode of timelapse is not supported when \"by object\" sequence is enabled. Set "
+                      "Timelapse to Traditional, or set Print sequence to By layer.")};
 
         if (m_config.enable_wrapping_detection) {
             StringObjectException clumping_detection_setting_err;
-            clumping_detection_setting_err.string = L("Clumping detection is not supported when \"by object\" sequence is enabled.");
+            clumping_detection_setting_err.string = L("Clumping detection is not supported when \"by object\" "
+                                                      "sequence is enabled. Turn off Enable clumping detection, or "
+                                                      "set Print sequence to By layer.");
             clumping_detection_setting_err.opt_key = "enable_wrapping_detection";
             return clumping_detection_setting_err;
         }
@@ -2351,13 +2402,16 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
     if (m_config.enable_prime_tower) {
         for (const PrintObject* object : m_objects) {
             if (object->config().precise_z_height.value) {
-                warn(L("Enabling both precise Z height and the prime tower may cause slicing errors."), "precise_z_height");
+                warn(L("Enabling both precise Z height and the prime tower may cause slicing errors. If slicing "
+                       "fails or the prime tower looks wrong in the preview, turn off Precise Z height in the "
+                       "quality settings."), "precise_z_height");
                 break;
             }
         }
     } else {
         if (m_config.enable_wrapping_detection)
-            warn(L("A prime tower is required for clumping detection; otherwise, there may be flaws on the model."), "enable_prime_tower");
+            warn(L("A prime tower is required for clumping detection; otherwise, there may be flaws on the model. "
+                   "Enable the prime tower, or turn off Enable clumping detection."), "enable_prime_tower");
     }
 
     if (m_config.spiral_mode) {
@@ -2366,14 +2420,18 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
             total_copies_count += object->instances().size();
         // #4043
         if (total_copies_count > 1 && m_config.print_sequence != PrintSequence::ByObject)
-            return {L("Please select \"By object\" print sequence to print multiple objects in spiral vase mode."), nullptr, "spiral_mode"};
+            return {L("Please select \"By object\" print sequence to print multiple objects in spiral vase mode. "
+                      "Spiral vase prints one continuous wall, so several objects can only be printed one after "
+                      "another."), nullptr, "spiral_mode"};
         // A mixed (virtual) filament always resolves to multiple physical components, which
         // spiral vase cannot print.
         const auto &is_mixed = m_config.filament_is_mixed.values;
         for (const PrintObject *object : m_objects)
             for (unsigned int ext : object->object_extruders())
                 if (ext < is_mixed.size() && is_mixed[ext])
-                    return {L("Spiral (vase) mode does not work when an object contains more than one material."), nullptr, "spiral_mode"};
+                    return {L("Spiral (vase) mode does not work when an object contains more than one material. It "
+                              "prints one continuous spiral with one filament: assign the whole object to one "
+                              "filament, or turn off Spiral vase."), nullptr, "spiral_mode"};
         assert(m_objects.size() == 1);
         const auto all_regions = m_objects.front()->all_regions();
         if (all_regions.size() > 1) {
@@ -2381,7 +2439,9 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
             if (std::any_of(all_regions.begin() + 1, all_regions.end(), [this, ra = all_regions.front()](const auto rb) {
                 return !Layer::is_perimeter_compatible(*this, ra, rb);
             })) {
-                return {L("Spiral (vase) mode does not work when an object contains more than one material."), nullptr, "spiral_mode"};
+                return {L("Spiral (vase) mode does not work when an object contains more than one material. It "
+                          "prints one continuous spiral with one filament: assign the whole object to one filament, "
+                          "or turn off Spiral vase."), nullptr, "spiral_mode"};
             }
         }
     }
@@ -2467,7 +2527,9 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
             if (shrinkage_compensation_z != 1. && layers.back() > (this->config().printable_height / shrinkage_compensation_z + EPSILON)) {
                 // The object exceeds the maximum build volume height because of shrinkage compensation.
                 return StringObjectException{
-                    Slic3r::format(_u8L("While the object %1% itself fits the build volume, it exceeds the maximum build volume height because of material shrinkage compensation."), print_object.model_object()->name),
+                    Slic3r::format(_u8L("While the object %1% itself fits the build volume, it exceeds the maximum "
+                                        "build volume height because of material shrinkage compensation. Scale the "
+                                        "object down, or lower the filament's Shrinkage (Z) setting."), print_object.model_object()->name),
                     print_object.model_object(),
                     ""
                 };
@@ -2497,7 +2559,8 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
             print_object.model_object()->has_custom_layering()) {
             if (const std::vector<coordf_t> &layers = layer_height_profile(print_object_idx); ! layers.empty())
                 if (! check_object_layers_fixed(print_object.slicing_parameters(), layers))
-                    return {_u8L("Variable layer height is not supported with Organic supports.") };
+                    return {_u8L("Variable layer height is not supported with Organic supports. Remove the variable "
+                                 "layer height from the object, or choose another support Style.") };
         }
 
     if (this->has_wipe_tower() && ! m_objects.empty()) {
@@ -2509,7 +2572,8 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
             const auto  &is_mixed = m_config.filament_is_mixed.values;
             const size_t wipe_idx = size_t(m_config.wipe_tower_filament - 1);
             if (wipe_idx < is_mixed.size() && is_mixed[wipe_idx])
-                return { L("The wipe tower filament cannot be a mixed filament."), nullptr, "wipe_tower_filament" };
+                return { L("The wipe tower filament cannot be a mixed filament. Choose a regular filament for the "
+                           "prime tower (Wipe tower filament in the process settings, Multimaterial)."), nullptr, "wipe_tower_filament" };
         }
 
         // Make sure all extruders use same diameter filament and have the same nozzle diameter
@@ -2537,25 +2601,34 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
         }
 
         if (! m_config.use_relative_e_distances)
-            return { L("The Wipe Tower is currently only supported with the relative extruder addressing (use_relative_e_distances=1).") };
+            return { L("The Wipe Tower is currently only supported with the relative extruder addressing "
+                       "(use_relative_e_distances=1). Turn on Use relative E distances in the printer settings, or "
+                       "turn off the prime tower.") };
 
         if (m_config.ooze_prevention && m_config.single_extruder_multi_material)
-            return {L("Ooze prevention is only supported with the wipe tower when 'single_extruder_multi_material' is off.")};
+            return {L("Ooze prevention is only supported with the wipe tower when 'single_extruder_multi_material' "
+                      "is off. Turn off Ooze prevention, or turn off Single Extruder Multi Material in the printer "
+                      "settings.")};
             
 #if 0
         if (m_config.gcode_flavor != gcfRepRapSprinter && m_config.gcode_flavor != gcfRepRapFirmware &&
             m_config.gcode_flavor != gcfRepetier && m_config.gcode_flavor != gcfMarlinLegacy && m_config.gcode_flavor != gcfMarlinFirmware)
-            return { L("The prime tower is currently only supported for the Marlin, RepRap/Sprinter, RepRapFirmware and Repetier G-code flavors.")};
+            return { L("The prime tower is currently only supported for the Marlin, RepRap/Sprinter, RepRapFirmware "
+                       "and Repetier G-code flavors. Choose one of them as G-code flavor in the printer settings, or "
+                       "turn off the prime tower.")};
 
         if ((m_config.print_sequence == PrintSequence::ByObject) && extruders.size() > 1)
-            return { L("A prime tower is not supported in \u201cBy object\u201d print."), nullptr, "enable_prime_tower" };
+            return { L("A prime tower is not supported in \u201cBy object\u201d print. Set Print sequence to By "
+                       "layer, or turn off the prime tower."), nullptr, "enable_prime_tower" };
 
         // BBS: When prime tower is on, object layer and support layer must be aligned. So support gap should be multiple of object layer height.
         for (size_t i = 0; i < m_objects.size(); i++) {
             const PrintObject* object = m_objects[i];
             const SlicingParameters& slicing_params = object->slicing_parameters();
             if (object->config().adaptive_layer_height) {
-                return  { L("A prime tower is not supported when adaptive layer height is on. It requires that all objects have the same layer height."), object, "adaptive_layer_height" };
+                return  { L("A prime tower is not supported when adaptive layer height is on. It requires that all "
+                            "objects have the same layer height. Turn off Adaptive layer height, or turn off the "
+                            "prime tower."), object, "adaptive_layer_height" };
             }
 
             if (!object->config().enable_support)
@@ -2563,7 +2636,8 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
 
             double gap_layers = slicing_params.gap_object_support / slicing_params.layer_height;
             if (gap_layers - (int)gap_layers > EPSILON) {
-                return {L("A prime tower requires any \u201csupport gap\u201d to be a multiple of layer height."), object};
+                return {L("A prime tower requires any \u201csupport gap\u201d to be a multiple of layer height. Set "
+                          "the support Top Z distance to 0 or to a whole multiple of the layer height."), object};
             }
         }
 #endif
@@ -2582,14 +2656,20 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                 const SlicingParameters &slicing_params = object->slicing_parameters();
                 if (std::abs(slicing_params.first_print_layer_height - slicing_params0.first_print_layer_height) > EPSILON ||
                     std::abs(slicing_params.layer_height             - slicing_params0.layer_height            ) > EPSILON)
-                    return {L("A prime tower requires that all objects have the same layer height."), object, "initial_layer_print_height"};
+                    return {L("A prime tower requires that all objects have the same layer height. Give every object "
+                              "the same layer height and first layer height (an object with its own settings shows "
+                              "them in the object list), or turn off the prime tower."), object, "initial_layer_print_height"};
                 if (slicing_params.raft_layers() != slicing_params0.raft_layers())
-                    return {L("A prime tower requires that all objects are printed over the same number of raft layers."), object, "raft_layers"};
+                    return {L("A prime tower requires that all objects are printed over the same number of raft "
+                              "layers. Give every object the same number of raft layers (check objects with their "
+                              "own support settings in the object list), or turn off the prime tower."), object, "raft_layers"};
                 // BBS: support gap can be multiple of object layer height, remove _L()
 #if 0
                 if (slicing_params0.gap_object_support != slicing_params.gap_object_support ||
                     slicing_params0.gap_support_object != slicing_params.gap_support_object)
-                    return {L("The prime tower is only supported for multiple objects if they are printed with the same support_top_z_distance."), object};
+                    return {L("The prime tower is only supported for multiple objects if they are printed with the "
+                              "same support_top_z_distance. Give every object the same support Top Z distance, or "
+                              "turn off the prime tower."), object};
 #endif
                 // equal_layering() also compares the per-object min/max layer height limits, which
                 // differ with the objects' support extruders but leave a fixed layering identical.
@@ -2603,7 +2683,9 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                            a.object_print_z_min == b.object_print_z_min;
                 };
                 if (!equal_fixed_layering(slicing_params, slicing_params0))
-                    return  { L("A prime tower requires that all objects are sliced with the same layer height."), object };
+                    return  { L("A prime tower requires that all objects are sliced with the same layer height. Give "
+                                "every object the same layer height (an object with its own settings shows them in "
+                                "the object list), or turn off the prime tower."), object };
                 if (has_custom_layering) {
                     auto &lh         = layer_height_profile(i);
                     auto &lh_tallest = layer_height_profile(tallest_object_idx);
@@ -2635,7 +2717,9 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                         //if (i % 2 == 0 && layer_height_profiles[tallest_object_idx][i] > layer_height_profiles[idx_object][layer_height_profiles[idx_object].size() - 2])
                         //    break;
                         if (std::abs(layer_height_profiles[idx_object][i] - layer_height_profiles[tallest_object_idx][i]) > eps)
-                            return {L("The prime tower is only supported if all objects have the same variable layer height.")};
+                            return {L("The prime tower is only supported if all objects have the same variable layer "
+                                      "height. Remove the variable layer height from the objects, or give them "
+                                      "identical ones, or turn off the prime tower.")};
                         ++i;
                     }
                 }
@@ -2660,7 +2744,9 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
         unsigned int total_extruders_count = m_config.nozzle_diameter.size();
         for (const auto& extruder_idx : extruders)
             if ( extruder_idx >= total_extruders_count )
-                return {L("One or more object were assigned an extruder that the printer does not have.")};
+                return {L("One or more object were assigned an extruder that the printer does not have. In the "
+                          "object list, an object or part uses a filament number higher than the filaments set up "
+                          "for this printer: pick one of the existing filaments for it.")};
 #endif
 
         // Snapmaker Orca: each per tool head width column (Print::width_slot) is checked against that
@@ -2670,10 +2756,14 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
             if (width == 0) {
                 // Default "auto-generated" extrusion width is always valid.
             } else if (width <= layer_height) {
-                err_msg = Slic3r::format(_u8L("Line width too small on extruder %1%"), head + 1);
+                err_msg = Slic3r::format(_u8L("Line width too small on extruder %1%: a line width must be wider than "
+                                              "the layer height. Raise it in the quality settings, or set it to 0 "
+                                              "for the automatic width."), head + 1);
                 return false;
             } else if (width > nozzle * MAX_LINE_WIDTH_MULTIPLIER) {
-                err_msg = Slic3r::format(_u8L("Line width too large on extruder %1%"), head + 1);
+                err_msg = Slic3r::format(_u8L("Line width too large on extruder %1%: a line width can be at most "
+                                              "five times the nozzle diameter. Lower it in the quality settings, or "
+                                              "set it to 0 for the automatic width."), head + 1);
                 return false;
             }
             return true;
@@ -2719,16 +2809,19 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                     // The object has some form of support and either support_filament or support_interface_filament
                     // will be printed with the current tool without a forced tool change. Play safe, assert that all object nozzles
                     // are of the same diameter.
-                    return {L("Printing with multiple extruders of differing nozzle diameters. "
-                           "If support is to be printed with the current filament (support_filament == 0 or support_interface_filament == 0), "
-                           "all nozzles have to be of the same diameter."), object, "support_filament"};
+                    return {L("Printing with multiple extruders of differing nozzle diameters. If support is to be "
+                              "printed with the current filament (support_filament == 0 or "
+                              "support_interface_filament == 0), all nozzles have to be of the same diameter. Choose "
+                              "specific Support/raft base and interface filaments in the support settings, or use "
+                              "the same nozzle size on every extruder."), object, "support_filament"};
                 }
 #endif
 
                 // BBS
 #if 0
                 if (this->has_wipe_tower() && object->config().independent_support_layer_height) {
-                    return {L("A prime tower requires that support has the same layer height as the object."), object, "support_filament"};
+                    return {L("A prime tower requires that support has the same layer height as the object. Turn off "
+                              "Independent support layer height in the support settings, or turn off the prime tower."), object, "support_filament"};
                 }
 #endif
 
@@ -2736,13 +2829,19 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                 if (const double support_nozzle = object->config().support_nozzle_diameter.value; support_nozzle > 0.) {
                     if (std::none_of(m_config.nozzle_diameter.values.begin(), m_config.nozzle_diameter.values.end(),
                                      [support_nozzle](double d) { return std::abs(d - support_nozzle) < EPSILON; }))
-                        return {L("No extruder has a nozzle matching the support nozzle diameter."), object, "support_nozzle_diameter"};
+                        return {L("No extruder has a nozzle matching the support nozzle diameter. Set Support nozzle "
+                                  "diameter to the size of a nozzle that is installed, or put a nozzle of that size "
+                                  "on one of the tool heads."), object, "support_nozzle_diameter"};
                     if (object->config().support_filament.value > 0 &&
                         std::abs(m_config.nozzle_diameter.get_at(object->config().support_filament.value - 1) - support_nozzle) > EPSILON)
-                        return {L("The support/raft base filament prints with a nozzle that does not match the support nozzle diameter."), object, "support_filament"};
+                        return {L("The support/raft base filament prints with a nozzle that does not match the "
+                                  "support nozzle diameter. Choose a support base filament loaded on a nozzle of "
+                                  "that size, or change Support nozzle diameter."), object, "support_filament"};
                     if (object->config().support_interface_filament.value > 0 &&
                         std::abs(m_config.nozzle_diameter.get_at(object->config().support_interface_filament.value - 1) - support_nozzle) > EPSILON)
-                        return {L("The support/raft interface filament prints with a nozzle that does not match the support nozzle diameter."), object, "support_interface_filament"};
+                        return {L("The support/raft interface filament prints with a nozzle that does not match the "
+                                  "support nozzle diameter. Choose a support interface filament loaded on a nozzle "
+                                  "of that size, or change Support nozzle diameter."), object, "support_interface_filament"};
                 } else if (! warned_support_mixed_nozzles && max_nozzle_diameter - min_nozzle_diameter > EPSILON &&
                            (object->config().support_filament.value == 0 || object->config().support_interface_filament.value == 0)) {
                     // Supports left on the "default" filament follow the active extruder, mixing nozzle sizes.
@@ -2761,15 +2860,23 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                         continue;
                     if (object->resolved_default_support_filament(interface_role) == 0)
                         return {interface_role ?
-                                    L("No loaded filament matches the support/raft interface material (and the support nozzle diameter).") :
-                                    L("No loaded filament matches the support/raft base material (and the support nozzle diameter)."),
+                                    L("No loaded filament matches the support/raft interface material (and the "
+                                      "support nozzle diameter). Load a filament of that material (on a nozzle of "
+                                      "the support size), or change the support interface material.") :
+                                    L("No loaded filament matches the support/raft base material (and the support "
+                                      "nozzle diameter). Load a filament of that material (on a nozzle of the "
+                                      "support size), or change the support base material."),
                                 object, interface_role ? "support_interface_material" : "support_base_material"};
                     if (const int configured = (interface_role ? object->config().support_interface_filament :
                                                                  object->config().support_filament).value;
                         configured > 0 && ! object->support_filament_allowed((unsigned int)configured, interface_role))
                         return {interface_role ?
-                                    L("The support/raft interface filament is not of the support/raft interface material.") :
-                                    L("The support/raft base filament is not of the support/raft base material."),
+                                    L("The support/raft interface filament is not of the support/raft interface "
+                                      "material. Choose a filament of that material for the support interface, or "
+                                      "change the support interface material.") :
+                                    L("The support/raft base filament is not of the support/raft base material. "
+                                      "Choose a filament of that material for the support base, or change the "
+                                      "support base material."),
                                 object, interface_role ? "support_interface_filament" : "support_filament"};
                 }
 
@@ -2798,9 +2905,12 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                             support_material_flow(object).width(),
                             support_material_interface_flow(object).width());
                         if (object->config().tree_support_branch_diameter_organic < 2. * extrusion_width - EPSILON)
-                            return { L("Organic support branch diameter must not be smaller than 2x support material extrusion width."), object, "tree_support_branch_diameter_organic" };
+                            return { L("Organic support branch diameter must not be smaller than 2x support material "
+                                       "extrusion width. Raise Tree support branch diameter, or lower the support "
+                                       "line width."), object, "tree_support_branch_diameter_organic" };
                         if (object->config().tree_support_branch_diameter_organic < object->config().tree_support_tip_diameter)
-                            return { L("Organic support branch diameter must not be smaller than support tree tip diameter."), object, "tree_support_branch_diameter_organic" };
+                            return { L("Organic support branch diameter must not be smaller than support tree tip "
+                                       "diameter. Raise Tree support branch diameter, or lower the tip diameter."), object, "tree_support_branch_diameter_organic" };
                     }
                 } else if (object->config().support_base_pattern == SupportMaterialPattern::smpLightning) {
                     // Orca: check if the Lightning base pattern selected
@@ -2843,12 +2953,14 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                 first_layer_min_nozzle_diameter = min_nozzle_diameter;
             }
             if (initial_layer_print_height > first_layer_min_nozzle_diameter)
-                return {L("Layer height cannot exceed nozzle diameter."), object, "initial_layer_print_height"};
+                return {L("Layer height cannot exceed nozzle diameter. Lower the layer height (or the first layer "
+                          "height), or choose a process preset made for this nozzle size."), object, "initial_layer_print_height"};
 
             // validate layer_height
             double layer_height = object->config().layer_height.value;
             if (layer_height > min_nozzle_diameter)
-                return {L("Layer height cannot exceed nozzle diameter."), object, "layer_height"};
+                return {L("Layer height cannot exceed nozzle diameter. Lower the layer height (or the first layer "
+                          "height), or choose a process preset made for this nozzle size."), object, "layer_height"};
 
             // Validate extrusion widths, per tool head (Snapmaker Orca, line widths per tool head).
             std::string err_msg;
@@ -3055,7 +3167,9 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                                                              "extruders in use, or change the preferred layer heights."),
                                                         extruder_idx + 1, extruder_height, layer_height, conforming), object, "extruder_layer_height" };
                             }
-                            return { Slic3r::format(_u8L("The layer height of extruder %1% (%2% mm) cannot exceed its nozzle diameter."),
+                            return { Slic3r::format(_u8L("The layer height of extruder %1% (%2% mm) cannot exceed "
+                                                         "its nozzle diameter. Lower its preferred layer height in "
+                                                         "the sidebar nozzle tab, or set it to Default."),
                                                     extruder_idx + 1, extruder_height), object, "extruder_layer_height" };
                         }
                         if (pitch_from_features && multiplier <= 1)
@@ -3471,9 +3585,12 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                 }
                 if (object_has_combined_regions) {
                     if (m_config.spiral_mode)
-                        return { _u8L("Per-extruder layer heights are not supported in spiral vase mode."), object, "extruder_layer_height" };
+                        return { _u8L("Per-extruder layer heights are not supported in spiral vase mode. Turn off "
+                                      "Spiral vase, or set the extruders' preferred layer heights to Default."), object, "extruder_layer_height" };
                     if (object->config().interface_shells)
-                        return { _u8L("Per-extruder layer heights are not supported together with interface shells."), object, "extruder_layer_height" };
+                        return { _u8L("Per-extruder layer heights are not supported together with interface shells. "
+                                      "Turn off Interface shells, or set the extruders' preferred layer heights to "
+                                      "Default."), object, "extruder_layer_height" };
                     // The beams are carved per object layer before the runs combine; a run keeps
                     // only the shape common to its layers, so a combined region's beam cells vanish
                     // while the holes for them stay in the other region.
@@ -3506,9 +3623,14 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                     if (bridge_width <= 0.)
                         return std::nullopt;
                     if (bridge_width > nozzle_diameter)
-                        return refused_on_head(Slic3r::format(_u8L("Bridge line width must not exceed the nozzle diameter of extruder %1%"), head + 1), object, "bridge_line_width", head);
+                        return refused_on_head(Slic3r::format(_u8L("Bridge line width must not exceed the nozzle "
+                                                                   "diameter of extruder %1%: lower the bridge line "
+                                                                   "width in the quality settings."), head + 1), object, "bridge_line_width", head);
                     if (!allow_thin_bridge_width && bridge_width <= layer_height)
-                        return refused_on_head(Slic3r::format(_u8L("Line width too small on extruder %1%"), head + 1), object, "bridge_line_width", head);
+                        return refused_on_head(Slic3r::format(_u8L("Line width too small on extruder %1%: a line "
+                                                                   "width must be wider than the layer height. Raise "
+                                                                   "it in the quality settings, or set it to 0 for "
+                                                                   "the automatic width."), head + 1), object, "bridge_line_width", head);
                     return std::nullopt;
                 };
                 for (FlowRole bridge_role : { frPerimeter, frInfill, frSolidInfill, frTopSolidInfill })
@@ -3568,12 +3690,14 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
     } else {
         // Absolute mode: any occurrence of "G92 E0" is incompatible.
         if (before_has_g92_any)
-            return {L("\"G92 E0\" was found in before_layer_change_gcode, which is incompatible with absolute extruder "
-                      "addressing."),
+            return {L("\"G92 E0\" was found in before_layer_change_gcode, which is incompatible with absolute "
+                      "extruder addressing. Remove it from the printer's Before layer change G-code, or turn on Use "
+                      "relative E distances."),
                     nullptr, "before_layer_change_gcode"};
         if (layer_has_g92_any)
             return {L("\"G92 E0\" was found in layer_change_gcode, which is incompatible with absolute extruder "
-                      "addressing."),
+                      "addressing. Remove it from the printer's Layer change G-code, or turn on Use relative E "
+                      "distances."),
                     nullptr, "layer_change_gcode"};
 	}
 
@@ -3778,7 +3902,8 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
 
             // check wall sequence and precise outer wall
             if (m_default_region_config.precise_outer_wall && m_default_region_config.wall_sequence != WallSequence::InnerOuter)
-                warn(L("The precise wall option will be ignored for outer-inner or inner-outer-inner wall sequences."), "precise_outer_wall");
+                warn(L("The precise wall option will be ignored for outer-inner or inner-outer-inner wall sequences. "
+                       "Set Walls printing order to Inner/Outer to use it."), "precise_outer_wall");
 
             // check adaptive pressure advance model of every extruder variant column of the used filaments
             const std::vector<int> &self_index = m_config.filament_self_index.values;
@@ -3795,7 +3920,9 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                     if (!pa_model.empty()) {
                         std::string validation_error = AdaptivePAProcessor::validate_adaptive_pa_model(pa_model);
                         if (!validation_error.empty()) {
-                            warn(L("The Adaptive Pressure Advance model for one or more extruders may contain invalid values."),
+                            warn(L("The Adaptive Pressure Advance model for one or more extruders may contain "
+                                   "invalid values. Check Adaptive pressure advance measurements in the filament "
+                                   "settings: every line needs three numbers (pressure advance, flow, acceleration)."),
                                  "adaptive_pressure_advance_model");
                             break;
                         }
@@ -3810,7 +3937,8 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
             add_warning(motion_warning);
     }
     if (!this->has_same_shrinkage_compensations())
-        warn(L("Filament shrinkage will not be used because filament shrinkage for the used filaments does not match."));
+        warn(L("Filament shrinkage will not be used because filament shrinkage for the used filaments does not "
+               "match. Give the filaments of this plate the same Shrinkage (XY) value in their settings."));
     return {};
 }
 
@@ -6374,11 +6502,15 @@ void Print::_make_wipe_tower()
             BOOST_LOG_TRIVIAL(error) << boost::format("wipe tower footprint [%1%,%2%]-[%3%,%4%] leaves printable [%5%,%6%]-[%7%,%8%]") %
                 unscaled(fp.min.x()) % unscaled(fp.min.y()) % unscaled(fp.max.x()) % unscaled(fp.max.y()) %
                 unscaled(pr.min.x()) % unscaled(pr.min.y()) % unscaled(pr.max.x()) % unscaled(pr.max.y());
-            throw Slic3r::SlicingError(L("Prime Tower") + L(" is partially outside the printable area, and it cannot be printed.\n"));
+            throw Slic3r::SlicingError(L("Prime Tower") + L(" is partially outside the printable area, and it cannot "
+                                                            "be printed. Drag it fully onto the plate; a wider brim "
+                                                            "or more filaments make the tower larger.\n"));
         }
         // The cutter/purge corner is a physical obstacle — the brim must stay out like the body.
         if (!intersection(get_bed_excluded_area(m_config), Polygons{footprint}).empty())
-            throw Slic3r::SlicingError(L("Prime Tower") + L(" is too close to an exclusion area, and collisions will be caused.\n"));
+            throw Slic3r::SlicingError(L("Prime Tower") + L(" is too close to an exclusion area, and collisions will "
+                                                            "be caused. Drag the prime tower out of the shaded area "
+                                                            "on the plate.\n"));
     }
 }
 

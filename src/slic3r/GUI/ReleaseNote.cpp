@@ -2041,10 +2041,13 @@ void InputIpAddressDialog::workerThreadFunc(std::string str_ip, std::string str_
     if (result < 0) {
         post_update_test_msg(w, wxEmptyString, true);
         if (result == -1) {
-            post_update_test_msg(w, _L("Failed to connect to printer."), false);
+            post_update_test_msg(w, _L("The printer did not answer at this IP address. Check that it is on and on "
+                                       "the same Wi-Fi as this Mac, and allow this app under System Settings > "
+                                       "Privacy & Security > Local Network."), false);
         }
         else if (result == -2) {
-            post_update_test_msg(w, _L("Failed to publish login request."), false);
+            post_update_test_msg(w, _L("The printer answered but did not accept the connection. Check the Access "
+                                       "Code in the printer's network settings on its screen, and enter it again."), false);
         }
         else if (result == -3) {
             wxCommandEvent event(EVT_CHECK_IP_ADDRESS_LAYOUT);
@@ -2125,14 +2128,18 @@ void InputIpAddressDialog::on_check_ip_address_failed(wxCommandEvent& evt)
 {
     m_result = evt.GetInt();
     if (m_result == -2) {
-        update_test_msg(_L("Connection failed, please double check IP and Access Code"), false);
+        update_test_msg(_L("Connection failed: the IP address or the Access Code is wrong. Compare both with the "
+                           "network settings on the printer's screen."), false);
     }
     else {
         if (m_need_input_sn) {
-            update_test_msg(_L("Connection failed! If your IP and Access Code is correct, \nplease move to step 3 for troubleshooting network issues"), false);
+            update_test_msg(_L("Connection failed. If the IP and Access Code are correct, the network blocks the "
+                               "connection: \nsee step 3 for network troubleshooting, and allow this app under "
+                               "System Settings > Privacy & Security > Local Network."), false);
         }
         else {
-            update_test_msg(_L("Connection failed! Please refer to the wiki page."), false);
+            update_test_msg(_L("Connection failed. Check that the printer is on and on the same Wi-Fi as this Mac, "
+                               "and allow this app under System Settings > Privacy & Security > Local Network."), false);
         }
 
         Layout();

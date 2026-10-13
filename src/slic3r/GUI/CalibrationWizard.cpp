@@ -230,7 +230,7 @@ void CalibrationWizard::set_cali_method(CalibrationMethod method)
 bool CalibrationWizard::save_preset(const std::string &old_preset_name, const std::string &new_preset_name, const std::map<std::string, ConfigOption *> &key_values, wxString& message)
 {
     if (new_preset_name.empty()) {
-        message = _L("The name cannot be empty.");
+        message = _L("Enter a name.");
         return false;
     }
 
@@ -275,7 +275,8 @@ bool CalibrationWizard::save_preset(const std::string &old_preset_name, const st
     // Preset* preset = &m_presets.preset(it - m_presets.begin(), true);
     if (!new_preset) {
         BOOST_LOG_TRIVIAL(info) << "create new preset failed";
-        message = _L("create new preset failed.");
+        message = _L("The calibrated filament preset could not be created: the name may already be in use, or the "
+                     "app can't write to its data folder. Choose another name and try again.");
         return false;
     }
 
@@ -306,7 +307,7 @@ bool CalibrationWizard::save_preset(const std::string &old_preset_name, const st
 bool CalibrationWizard::save_preset_with_index(const std::string &old_preset_name, const std::string &new_preset_name, const std::map<std::string, ConfigIndexValue> &key_values, wxString &message)
 {
     if (new_preset_name.empty()) {
-        message = _L("The name cannot be empty.");
+        message = _L("Enter a name.");
         return false;
     }
 
@@ -359,7 +360,8 @@ bool CalibrationWizard::save_preset_with_index(const std::string &old_preset_nam
     // Preset* preset = &m_presets.preset(it - m_presets.begin(), true);
     if (!new_preset) {
         BOOST_LOG_TRIVIAL(info) << "create new preset failed";
-        message = _L("create new preset failed.");
+        message = _L("The calibrated filament preset could not be created: the name may already be in use, or the "
+                     "app can't write to its data folder. Choose another name and try again.");
         return false;
     }
 
@@ -970,7 +972,9 @@ void PressureAdvanceWizard::on_cali_save()
                     return;
                 }
                 if (save_page->is_all_failed()) {
-                    MessageDialog msg_dlg(nullptr, _L("The failed test result has been dropped."), wxEmptyString, wxOK);
+                    MessageDialog msg_dlg(nullptr, _L("The test result was not saved because the printer reported "
+                                                      "the test as failed. Check the calibration print and run the "
+                                                      "test again."), wxEmptyString, wxOK);
                     msg_dlg.ShowModal();
                     back_preset_info(curr_obj, true);
                     show_step(start_step);
@@ -1373,7 +1377,9 @@ void FlowRateWizard::on_cali_save()
                 return;
             }
             if (save_page->is_all_failed()) {
-                MessageDialog msg_dlg(nullptr, _L("The failed test result has been dropped."), wxEmptyString, wxOK);
+                MessageDialog msg_dlg(nullptr, _L("The test result was not saved because the printer reported the "
+                                                  "test as failed. Check the calibration print and run the test "
+                                                  "again."), wxEmptyString, wxOK);
                 msg_dlg.ShowModal();
                 back_preset_info(curr_obj, true);
                 show_step(start_step);

@@ -2522,7 +2522,9 @@ void ObjectList::load_modifier(const wxArrayString& input_files, ModelObject& mo
         catch (std::exception&) {
             if (!is_user_cancel) {
                 // auto msg = _L("Error!") + " " + input_file + " : " + e.what() + ".";
-                auto msg = _L("Error!") + " " + _L("Failed to get the model data in the current file.");
+                auto msg = _L("Error!") + " " + _L("The file could not be read as a 3D model: it may be damaged, "
+                                                   "empty, or in a format this app can't read. Export it again from "
+                                                   "your design app, for example as STL or 3MF.");
                 show_error(parent, msg);
             }
             return;
@@ -3000,7 +3002,8 @@ bool ObjectList::del_subobject_from_object(const int obj_idx, const int idx, con
             if (vol->is_model_part())
                 ++solid_cnt;
         if (volume->is_model_part() && solid_cnt == 1) {
-            Slic3r::GUI::show_error(nullptr, _L("Deleting the last solid part is not allowed."));
+            Slic3r::GUI::show_error(nullptr, _L("An object needs at least one solid part, so its last one can't be "
+                                                "deleted. Delete the whole object instead, or add another part first."));
             return false;
         }
         if (object->is_cut() && (volume->is_model_part() || volume->is_negative_volume())) {
@@ -5724,7 +5727,9 @@ void ObjectList::change_part_type()
       }
 
       if (model_part_cnt == 1) {
-        Slic3r::GUI::show_error(nullptr, _(L("The type of the last solid object part cannot be changed.")));
+        Slic3r::GUI::show_error(nullptr, _(L("An object needs at least one solid part, so its last one can't become "
+                                             "a modifier, negative part or support blocker/enforcer. Add another "
+                                             "solid part first.")));
         return;
       }
     }
@@ -5837,7 +5842,9 @@ void ObjectList::change_part_type()
     }
 
     if (would_remove_all_for_any) {
-      Slic3r::GUI::show_error(nullptr, _(L("The type of the last solid object part cannot be changed.")));
+      Slic3r::GUI::show_error(nullptr, _(L("An object needs at least one solid part, so its last one can't become a "
+                                           "modifier, negative part or support blocker/enforcer. Add another solid "
+                                           "part first.")));
       return;
     }
   }
@@ -6073,7 +6080,9 @@ void ObjectList::set_volume_type(ModelVolumeType new_type, bool preserve_ps_subt
         for (const auto& sel : selected_part_cnt) {
             auto it = total_part_cnt.find(sel.first);
             if (it != total_part_cnt.end() && it->second > 0 && sel.second == it->second) {
-                Slic3r::GUI::show_error(nullptr, _(L("The type of the last solid object part cannot be changed.")));
+                Slic3r::GUI::show_error(nullptr, _(L("An object needs at least one solid part, so its last one can't "
+                                                     "become a modifier, negative part or support blocker/enforcer. "
+                                                     "Add another solid part first.")));
                 return;
             }
         }
@@ -6556,7 +6565,9 @@ void GUI::ObjectList::smooth_mesh()
     };
     auto show_smooth_mesh_error_dlg = [](std::string name) {
         auto name_str = wxString::FromUTF8(name);
-        auto content  = wxString::Format(_L("\"%s\" part's mesh contains errors. Please repair it first."), name_str);
+        auto content  = wxString::Format(_L("The mesh of \"%s\" has errors (holes, or flipped or overlapping faces) "
+                                            "that subdividing would make worse. Repair it first: right-click it and "
+                                            "choose Fix Model."), name_str);
         WarningDialog dlg(static_cast<wxWindow *>(wxGetApp().mainframe), content, wxEmptyString, wxOK);
         dlg.ShowModal();
     };

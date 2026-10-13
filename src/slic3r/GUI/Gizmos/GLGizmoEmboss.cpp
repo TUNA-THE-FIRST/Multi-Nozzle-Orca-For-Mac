@@ -1589,7 +1589,7 @@ void GLGizmoEmboss::draw_text_input()
             warning_tool_tip += t;
         };
         if (is_text_empty(m_text)) 
-            append_warning(_u8L("Embossed text cannot contain only white spaces."));
+            append_warning(_u8L("The text is only spaces, so there is nothing to emboss. Type some letters."));
         if (m_text_contain_unknown_glyph)
             append_warning(_u8L("Text contains character glyph (represented by '?') unknown by font."));
 
@@ -1602,7 +1602,8 @@ void GLGizmoEmboss::draw_text_input()
         if (imgui_size > StyleManager::max_imgui_font_size)
             append_warning(_u8L("Too tall, diminished font height inside text input."));
         if (imgui_size < StyleManager::min_imgui_font_size)
-            append_warning(_u8L("Too small, enlarged font height inside text input."));
+            append_warning(_u8L("The font size was too small to emboss, so it was enlarged to the smallest size that "
+                                "works."));
         bool is_multiline = m_text_lines.get_lines().size() > 1;
         if (is_multiline && (prop.align.first == FontProp::HorizontalAlign::center || prop.align.first == FontProp::HorizontalAlign::right))
             append_warning(_u8L("Text doesn't show current horizontal alignment."));
@@ -1870,7 +1871,9 @@ void GLGizmoEmboss::draw_font_list()
             if (ImGui::BBLSelectable(face.name_truncated.c_str(), is_selected, flags, selectable_size)) {
                 if (!select_facename(wx_face_name)) {
                     del_index = idx;
-                    MessageDialog(wxGetApp().plater(), GUI::format_wxstr(_L("Font \"%1%\" can't be selected."), wx_face_name));
+                    MessageDialog(wxGetApp().plater(), GUI::format_wxstr(_L("The font \"%1%\" can't be used: it is "
+                                                                            "damaged or in a format the app can't "
+                                                                            "read. Choose another font."), wx_face_name));
                 } else {
                     ImGui::CloseCurrentPopup();
                 }
@@ -2205,7 +2208,8 @@ void GLGizmoEmboss::draw_delete_style_button() {
                                                    active_index + 1;
             
             if (next_style_index >= m_style_manager.get_styles().size()) {
-                MessageDialog msg(plater, _L("Can't remove the last existing style."), dialog_title, wxICON_ERROR | wxOK);
+                MessageDialog msg(plater, _L("The last text style can't be removed: at least one style must remain. "
+                                             "Add another style first."), dialog_title, wxICON_ERROR | wxOK);
                 msg.ShowModal();
                 break;
             }
@@ -2373,7 +2377,9 @@ void GLGizmoEmboss::draw_style_list() {
             process();
         } else {
             wxString title   = _L("Not valid style.");
-            wxString message = GUI::format_wxstr(_L("Style \"%1%\" can't be used and will be removed from a list."), style.name);
+            wxString message = GUI::format_wxstr(_L("The style \"%1%\" can't be used (its font is missing from this "
+                                                    "Mac or damaged), so it was removed from the list. Install the "
+                                                    "font and add the style again."), style.name);
             MessageDialog not_loaded_style_message(nullptr, message, title, wxOK);
             not_loaded_style_message.ShowModal();
             m_style_manager.erase(*selected_style_index);

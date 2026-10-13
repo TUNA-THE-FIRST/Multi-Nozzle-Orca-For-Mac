@@ -296,7 +296,9 @@ bool Moonraker::test_with_resolved_ip(wxString& msg) const
                 if (!res) {
                     BOOST_LOG_TRIVIAL(error) << "[Moonraker_Mqtt] version text validation failed";
                     wcp_loger.add_log("version text validation failed", false, "", "Moonraker_Mqtt", "error");
-                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : name));
+                    msg = GUI::format_wxstr(_L("The address answers, but the software there (%s) is not the host "
+                                               "type selected for this printer. Choose the host type that matches "
+                                               "the printer's software in the printer's connection settings."), (text ? *text : name));
                 } else {
                     BOOST_LOG_TRIVIAL(debug) << "[Moonraker_Mqtt] version validation succeeded";
                     wcp_loger.add_log("version validation succeeded", false, "", "Moonraker_Mqtt", "info");

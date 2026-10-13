@@ -133,7 +133,9 @@ void ConfigManipulation::check_nozzle_recommended_temperature_range(DynamicPrint
         need_check = true;
     }
     if (temperature_range_low > temperature_range_high) {
-        msg_text += _L("The recommended minimum temperature cannot be higher than the recommended maximum temperature.\n");
+        msg_text += _L("The recommended minimum nozzle temperature is higher than the recommended maximum, so no "
+                       "temperature satisfies both. Lower the minimum or raise the maximum in the filament settings."
+                       "\n");
         need_check = true;
     }
     if (need_check) {
@@ -204,7 +206,9 @@ void ConfigManipulation::check_adaptive_pressure_advance_model(DynamicPrintConfi
             break;
     }
     if (!error.empty()) {
-        wxString msg_text = _L("Adaptive Pressure Advance model validation failed:\n");
+        wxString msg_text = _L("The adaptive pressure advance values could not be read. Each line needs three "
+                               "numbers separated by commas: pressure advance, flow (mm³/s) and acceleration "
+                               "(mm/s²). The problem:\n");
         msg_text += from_u8(error);
         MessageDialog dialog(m_msg_dlg_parent, msg_text, "", wxICON_WARNING | wxOK);
         is_msg_dlg_already_exist = true;
@@ -223,7 +227,9 @@ void ConfigManipulation::check_filament_max_volumetric_speed(DynamicPrintConfig 
     // Snapmaker Orca: per variant column; only a column below the limit is reset, the others keep their value.
     const std::vector<size_t> too_small = filament_columns_below(*config, "filament_max_volumetric_speed", 0.5);
     if (!too_small.empty()) {
-        const wxString     msg_text = _(L("Too small max volumetric speed.\nValue was reset to 0.5"));
+        const wxString     msg_text = _(L("The maximum volumetric speed is too small: the filament would barely flow "
+                                          "and the print would take forever.\nIt was reset to 0.5 mm³/s; enter the "
+                                          "value from the filament's profile or its maker."));
         MessageDialog      dialog(nullptr, msg_text, "", wxICON_WARNING | wxOK);
         DynamicPrintConfig new_conf = *config;
         is_msg_dlg_already_exist    = true;
@@ -306,7 +312,10 @@ bool ConfigManipulation::check_layer_height(DynamicPrintConfig* config)
     const double layer_height = config->opt_float("layer_height");
 
     if (min_layer_height > EPSILON && layer_height < EPSILON) {
-        const wxString msg_text = wxString::Format(_L("Layer height is too small. It will be set to the minimum (%g mm)."), min_layer_height);
+        const wxString msg_text = wxString::Format(_L("The layer height is below the minimum the nozzle prints "
+                                                      "reliably. It is set to the minimum (%g mm); to print thinner "
+                                                      "layers, lower the minimum layer height in the printer "
+                                                      "settings (Extruder) first."), min_layer_height);
         MessageDialog dialog(wxGetApp().plater(), msg_text, "", wxICON_WARNING | wxOK);
         dialog.SetButtonLabel(wxID_OK, _L("OK"));
         is_msg_dlg_already_exist = true;
@@ -400,7 +409,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
     auto layer_height = config->opt_float("layer_height");
     if (layer_height < EPSILON)
     {
-        const wxString msg_text = _(L("Layer height too small\nIt has been reset to 0.2"));
+        const wxString msg_text = _(L("The layer height can't be 0: nothing would be printed.\n"
+                                      "It was reset to 0.2 mm."));
         MessageDialog dialog(m_msg_dlg_parent, msg_text, "", wxICON_WARNING | wxOK);
         DynamicPrintConfig new_conf = *config;
         is_msg_dlg_already_exist = true;
@@ -413,7 +423,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
     //BBS: ironing_spacing shouldn't be too small or equal to zero
     if (config->opt_float("ironing_spacing") < 0.05)
     {
-        const wxString msg_text = _(L("Ironing spacing too small\nIt has been reset to 0.1"));
+        const wxString msg_text = _(L("The ironing line spacing can't be 0: the nozzle would never move sideways.\n"
+                                      "It was reset to 0.1 mm."));
         MessageDialog dialog(nullptr, msg_text, "", wxICON_WARNING | wxOK);
         DynamicPrintConfig new_conf = *config;
         is_msg_dlg_already_exist = true;
@@ -424,7 +435,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
     }
     if (config->opt_float("support_ironing_spacing") < 0.05)
     {
-        const wxString msg_text = _(L("Ironing spacing too small\nIt has been reset to 0.1"));
+        const wxString msg_text = _(L("The ironing line spacing can't be 0: the nozzle would never move sideways.\n"
+                                      "It was reset to 0.1 mm."));
         MessageDialog dialog(nullptr, msg_text, "", wxICON_WARNING | wxOK);
         DynamicPrintConfig new_conf = *config;
         is_msg_dlg_already_exist = true;
@@ -436,7 +448,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
 
     if (config->option<ConfigOptionFloat>("initial_layer_print_height")->value < EPSILON)
     {
-        const wxString msg_text = _(L("Zero initial layer height is invalid.\n\nThe first layer height will be reset to 0.2."));
+        const wxString msg_text = _(L("The first layer height can't be 0: nothing would be printed on the bed.\n"
+                                      "\nIt will be reset to 0.2 mm."));
         MessageDialog dialog(m_msg_dlg_parent, msg_text, "", wxICON_WARNING | wxOK);
         DynamicPrintConfig new_conf = *config;
         is_msg_dlg_already_exist = true;

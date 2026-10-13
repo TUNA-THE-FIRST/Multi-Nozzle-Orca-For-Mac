@@ -281,7 +281,9 @@ static void handle_newer_3mf_schema(wxWindow* parent,
                             << ": file_version=" << file_schema
                             << ", supported_version=" << definition.current_version;
     show_info(parent,
-              _L("The current version of Snapmaker Orca cannot fully load this 3MF file. Please update to the latest version and try again."),
+              _L("This 3MF project was saved by a newer version of Snapmaker Orca, so some of its settings could not be "
+                 "loaded; the models are there, but check the settings before slicing.\n\n"
+                 "How to fix it: update Snapmaker Orca Mac, or open the project in the version that saved it."),
               _L("Loading 3MF"));
 }
 
@@ -992,7 +994,8 @@ bool Plater::has_illegal_filename_characters(const std::string& name)
 
 void Plater::show_illegal_characters_warning(wxWindow* parent)
 {
-    show_error(parent, _L("Invalid name, the following characters are not allowed:") + " <>:/\\|?*\"");
+    show_error(parent, _L("This name can't be used: it contains characters that are not allowed in file names. "
+                          "Remove these characters:") + " <>:/\\|?*\"");
 }
 
 void Plater::mark_plate_toolbar_image_dirty()
@@ -2722,7 +2725,8 @@ private:
                 m_error_label->SetLabel(wxEmptyString);
             else if (!valid && m_has_recipe_result)
                 m_error_label->SetLabel(
-                    _L("Unable to create a color mix from the current physical filament colors within the selected range."));
+                    _L("No mix of the loaded filament colors comes close to this color within the selected range. "
+                       "Widen the range, pick a color closer to your filaments, or load a filament nearer to it."));
             else if (m_hex_input && !m_syncing_inputs) {
                 wxColour parsed;
                 if (!try_parse_color_match_hex(m_hex_input->GetValue(), parsed))
@@ -3339,7 +3343,9 @@ bool Sidebar::priv::switch_diameter_to(const wxString &diameter)
     auto preset          = wxGetApp().preset_bundle->get_similar_printer_preset({}, diameter.ToStdString());
     if (preset == nullptr) {
         // ORCA add a text. this appears when user tries to change nozzle value but config doesnt have a inherited or compatible preset
-        MessageDialog dlg(this->plater, _L("Configuration incompatible"), _L("Warning"), wxICON_WARNING | wxOK);
+        MessageDialog dlg(this->plater, _L("The printer has no profile for this nozzle size, so the nozzle size was "
+                                           "not changed. Choose a size the printer has a profile for, or add a "
+                                           "printer profile for this nozzle in the printer settings."), _L("Warning"), wxICON_WARNING | wxOK);
         dlg.ShowModal();
         return false;
     }
@@ -5359,7 +5365,8 @@ Sidebar::Sidebar(Plater *parent)
         if (recipe.cancelled)
             return;
         if (!recipe.valid) {
-            show_error(this, _L("Unable to create a color match from the current physical filament colors."));
+            show_error(this, _L("No mix of the loaded filament colors comes close enough to the chosen color. Pick a "
+                                "color closer to your filaments, or load a filament nearer to it, and try again."));
             return;
         }
 
@@ -12161,7 +12168,9 @@ void Sidebar::update_nozzle_settings(bool switch_machine)
             if (new_height > nd_opt->values[i] + EPSILON) {
                 wxGetApp().plater()->get_notification_manager()->push_notification(
                     NotificationType::CustomNotification, NotificationManager::NotificationLevel::WarningNotificationLevel,
-                    GUI::format(_u8L("The layer height of extruder %1% cannot exceed its nozzle diameter (%2% mm)."), i + 1, nd_opt->values[i]));
+                    GUI::format(_u8L("The layer height of extruder %1% cannot exceed its nozzle diameter (%2% mm): a "
+                                     "nozzle can't extrude a layer thicker than its opening. Choose a lower layer "
+                                     "height, or set the nozzle size that is really installed if it is larger."), i + 1, nd_opt->values[i]));
                 show_nozzle_layer_height(lh_field, i);
                 return;
             }
@@ -13836,7 +13845,12 @@ void Sidebar::sync_ams_list(bool is_from_big_sync_btn)
     wxGetApp().app_config ->set("ams_filament_ids", p->ams_list_device, ams_filament_ids);
     if (!unknowns.empty()) {
         MessageDialog dlg(this,
-            _L("There are some unknown or incompatible filaments mapped to generic preset.\nPlease update Snapmaker Orca or restart Snapmaker Orca to check if there is an update to system presets.") + detail,
+            _L("Some filaments in the AMS are not known to this app, so they were set to a generic preset of the same "
+               "material.\n\n"
+               "Why this can happen: the filaments are newer than the app's filament list, or they are third-party "
+               "filaments without a preset.\n"
+               "How to fix it: reopen the app to fetch updated presets, or pick the right preset for each slot by hand "
+               "in the filament list.") + detail,
             _L("Sync filaments with AMS"), wxOK);
         dlg.ShowModal();
     }
@@ -15511,7 +15525,9 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
             } else {
                 notification_manager->push_notification(NotificationType::CustomNotification,
                                                         NotificationManager::NotificationLevel::ErrorNotificationLevel,
-                                                        format(_L("Ejecting of device %s (%s) has failed."), evt.data.first.name, evt.data.first.path)
+                                                        format(_L("Ejecting %s (%s) failed. A file on it is probably still open: close "
+                                                                  "the apps using it (Finder windows included) and eject again from Finder."),
+                                                               evt.data.first.name, evt.data.first.path)
                     );
             }
         });
@@ -16437,7 +16453,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     const wxString load_3mf_title              = _L("Load 3MF");
                     const wxString newer_3mf_title             = _L("Newer 3MF version");
                     const wxString bambu_project_title         = _L("BambuStudio Project");
-                    const wxString msg_unsupported_geometry    = _L("The 3MF is not supported by Snapmaker Orca, loading geometry data only.");
+                    const wxString msg_unsupported_geometry    = _L("This 3MF was made by another program, so only its models were "
+                                                                    "loaded; its print settings were not. Choose the printer, filaments and "
+                                                                    "process here before slicing.");
                     const wxString msg_old_orca_geometry       = _L("The 3MF file was generated by an old Snapmaker Orca version, loading geometry data only.");
                     const wxString msg_older_geometry          = _L("The 3MF file was generated by an older version, loading geometry data only.");
                     const wxString msg_bambu_geometry          = _L("The 3MF file was generated by BambuStudio, loading geometry data only.");
@@ -16709,7 +16727,11 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                             }
                             if (any_entry) {
                                 error_message += "\n";
-                                error_message += _u8L("Please correct them in the Param tabs");
+                                error_message += _u8L("These settings of the project have values this app does not "
+                                                      "accept, often because the project was made with another "
+                                                      "version or another slicer. Correct them in the printer, "
+                                                      "filament and process settings; the list above names each "
+                                                      "setting.");
                                 notify_manager->bbl_show_3mf_warn_notification(error_message);
                             }
                         }
@@ -17227,7 +17249,14 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 }
             }
         } catch (const ConfigurationError &e) {
-            std::string message = GUI::format(_L("Failed loading file \"%1%\". An invalid configuration was found."), filename.string()) + "\n\n" + e.what();
+            std::string message = GUI::format(_L("\"%1%\" could not be loaded because the print settings stored in it are "
+                                                 "invalid.\n\n"
+                                                 "Why this can happen: the file was saved by another slicer or a much newer "
+                                                 "version, or it was damaged.\n"
+                                                 "How to fix it: import only its models with File > Import > Import "
+                                                 "3MF/STL/STEP/SVG/OBJ/AMF..., then pick your presets. The setting that failed:"),
+                                      filename.string()) +
+                                  "\n\n" + e.what();
             GUI::show_error(q, message);
             continue;
         } catch (const std::exception &e) {
@@ -18386,7 +18415,8 @@ void Plater::priv::split_object(int obj_idx, bool auto_drop /* = true */)
     current_model_object->split(&new_objects, wxGetApp().app_config->get_bool("keep_painting"));
     if (new_objects.size() == 1)
         // #ysFIXME use notification
-        Slic3r::GUI::warning_catcher(q, _L("The selected object couldn't be split."));
+        Slic3r::GUI::warning_catcher(q, _L("The selected object could not be split: it is a single connected piece. Split "
+                                           "works only on models made of separate, non-touching parts."));
     else
     {
         // BBS no solid parts removed
@@ -18874,7 +18904,9 @@ void Plater::priv::notify_filament_compatibility_after_apply()
         notification_manager->push_notification(
             NotificationType::FilamentIncompatibleMixed,
             NotificationManager::NotificationLevel::ErrorNotificationLevel,
-            into_u8(_L("Mixed filaments contain incompatible material types. Please correct the mixed filaments settings before slicing.")));
+            into_u8(_L("A mixed filament combines filaments of different material types (for example PLA with PETG), "
+                       "which don't bond and don't print at the same temperature. Change its component filaments to "
+                       "the same material type before slicing.")));
     } else {
         notification_manager->close_notification_of_type(NotificationType::FilamentIncompatibleMixed);
     }
@@ -19441,7 +19473,10 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
     }
 
     if (new_model.objects.size() > 1 || new_model.objects.front()->volumes.size() > 1) {
-        MessageDialog dlg(q, _L("Unable to replace with more than one volume"), _L("Error during replacement"), wxOK | wxOK_DEFAULT | wxICON_WARNING);
+        MessageDialog dlg(q, _L("The part could not be replaced: the chosen file holds more than one object or part, and a "
+                                "part can only be replaced by a single one.\n\n"
+                                "How to fix it: export the replacement as one solid body, or import it as a new object instead."),
+                          _L("Error during replacement"), wxOK | wxOK_DEFAULT | wxICON_WARNING);
         dlg.ShowModal();
         return false;
     }
@@ -19659,7 +19694,7 @@ void Plater::priv::replace_all_with_stl()
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " replacing volume : " << input_path << " with " << new_path;
 
         if (!replace_volume_with_stl(object_idx, volume_idx, new_path, _u8L("Replace with 3D file"))) {
-            status += wxString::Format(_L("✖ Skipped %s: failed to replace.\n"), from_u8(volume_name));
+            status += wxString::Format(_L("✖ Skipped %s: its file could not be loaded or holds more than one part.\n"), from_u8(volume_name));
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " cannot replace volume : failed to replace with " << new_path;
             continue;
         }
@@ -20142,7 +20177,9 @@ void Plater::priv::reload_from_disk()
 #endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
     if (!fail_list.empty()) {
-        wxString message = _L("Unable to reload:") + "\n";
+        wxString message = _L("These could not be reloaded from disk because their source files were moved, renamed, "
+                              "deleted or can no longer be read. Right-click each one > Replace 3D file... to point it to "
+                              "the file's new location:") + "\n";
         for (const wxString& s : fail_list) {
             message += s + "\n";
         }
@@ -21863,7 +21900,9 @@ void Plater::priv::update_plugin_when_launch(wxCommandEvent &event)
                 MessageDialog dlg_ok(wxGetApp().mainframe, _L("Network plug-in switched successfully."), _L("Success"), wxOK | wxICON_INFORMATION);
                 dlg_ok.ShowModal();
             } else {
-                MessageDialog dlg_fail(wxGetApp().mainframe, _L("Failed to load network plug-in. Please restart the application."), _L("Restart Required"), wxOK | wxICON_WARNING);
+                MessageDialog dlg_fail(wxGetApp().mainframe, _L("The updated network plug-in could not be loaded while the app "
+                                                                "is running. Quit and reopen the app to finish installing it."),
+                                       _L("Restart Required"), wxOK | wxICON_WARNING);
                 dlg_fail.ShowModal();
             }
         } else {
@@ -23039,7 +23078,9 @@ void Plater::notify_vhl_dithering_conflict(bool local_z_enabled)
         return;
 
     MessageDialog dialog(this,
-        _L("Cannot enable both Variable Layer Height and Subdivide Mix Layer."),
+        _L("Variable layer height and Subdivide Mix Layer can't be used together: both change the layer heights, so "
+           "the result would be unpredictable. Turn off Subdivide Mix Layer in the process settings, or reset the "
+           "objects' variable layer height with the Variable Layer Height tool."),
         _L("Warning"), wxICON_WARNING | wxOK);
     dialog.ShowModal();
 }
@@ -23582,7 +23623,12 @@ bool Plater::priv::run_textured_mesh_import_dialog(Slic3r::Model& loaded_model, 
         return true;
     }
 
-    const wxString fallback_warning = _L("Texture import failed. The model appears to contain texture data, but the texture import process could not be completed. The model will be imported as geometry only.");
+    const wxString fallback_warning = _L("The model's colours (texture) could not be imported, so it was imported as plain "
+                                         "geometry.\n\n"
+                                         "Why this can happen: the texture image is missing next to the model file, is in an "
+                                         "unsupported format, or is very large.\n"
+                                         "How to fix it: keep the texture image in the same folder as the model, save it as PNG or "
+                                         "JPEG, and import again.");
 
     BOOST_LOG_TRIVIAL(info) << "handle_textured_mesh_import: opening texture import dialog";
 
@@ -24186,7 +24232,11 @@ int Plater::save_project(bool saveAs)
         Slic3r::fire_lifecycle_event(Slic3r::LifecycleEvent::ProjectBeforeSave, ctx);
     }
     if (export_3mf(into_path(filename), save_strategy) < 0) {
-        MessageDialog(this, _L("Failed to save the project.\nPlease check whether the folder exists online or if other programs have the project file open."),
+        MessageDialog(this, _L("The project could not be saved.\n\n"
+                               "Why this can happen: the folder no longer exists or is on a disconnected drive, macOS has "
+                               "not allowed this app to use it, another app has the file open, or the disk is full.\n"
+                               "How to fix it: use File > Save Project As to save it to another folder (for example Documents), "
+                               "or close the other app and save again."),
             _L("Save project"), wxOK | wxICON_WARNING).ShowModal();
         return wxID_CANCEL;
     }
@@ -24302,7 +24352,8 @@ void Plater::import_model_id(wxString download_info)
         //check file suffix
         wxString extension = fs::path(filename.wx_str()).extension().c_str();
         if (!extension.Contains(".3mf")) {
-            msg = _L("Download failed; unknown file format.");
+            msg = _L("The downloaded file is not a model or project this app can open (3MF, STL, STEP, OBJ...). Download it in "
+                     "your browser and check what it contains.");
             return;
         }
 
@@ -24315,7 +24366,9 @@ void Plater::import_model_id(wxString download_info)
             unused_filename.clear();
         }
         if (unused_filename.empty()) {
-            msg = _L("Importing to Snapmaker Orca failed. Please download the file and manually import it.");
+            msg = _L("The model could not be added to the project: it could not be downloaded or saved in the app's "
+                     "download folder (no internet connection, a full disk, or a folder the app may not write to). "
+                     "Download the file with your browser and open it with File > Import.");
             return;
         }
         filename = from_u8(unused_filename);
@@ -24360,7 +24413,8 @@ void Plater::import_model_id(wxString download_info)
                     }
 
                     if (size_limit) {
-                        msg = _L("Download failed; File size exception.");
+                        msg = _L("The download stopped because the file is larger than the app accepts for a direct import. "
+                                 "Download it in your browser and import it with File > Import.");
                     }
                     else {
                         msg = wxString::Format(_L("Project downloaded %d%%"), percent);
@@ -24374,7 +24428,10 @@ void Plater::import_model_id(wxString download_info)
                         error);
 
                     if (retry_count == max_retries) {
-                        msg = _L("Importing to Snapmaker Orca failed. Please download the file and manually import it.");
+                        msg = _L("The model could not be added to the project: it could not be downloaded or saved "
+                                 "in the app's download folder (no internet connection, a full disk, or a folder the "
+                                 "app may not write to). Download the file with your browser and open it with File > "
+                                 "Import.");
                         cont = false;
                     }
                 })
@@ -24397,7 +24454,10 @@ void Plater::import_model_id(wxString download_info)
                         }
                         boost::system::error_code ec;
                         fs::remove(tmp_path, ec);
-                        msg = _L("Importing to Snapmaker Orca failed. Please download the file and manually import it.");
+                        msg = _L("The model could not be added to the project: it could not be downloaded or saved "
+                                 "in the app's download folder (no internet connection, a full disk, or a folder the "
+                                 "app may not write to). Download the file with your browser and open it with File > "
+                                 "Import.");
                 }).perform_sync();
 
                 // for break while
@@ -25644,8 +25704,8 @@ void Plater::load_gcode(const wxString& filename)
     {
         BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": file does not exist: " << filename;
         MessageDialog(this,
-            _L("The selected file") + ":\n" + filename + "\n" + _L("does not exist."),
-            wxString(GCODEVIEWER_APP_NAME) + " - " + _L("Error occurs while loading G-code file"),
+            _L("The selected file") + ":\n" + filename + "\n" + _L("does not exist. It may have been moved, renamed or deleted, or it was on a drive that is no longer connected."),
+            wxString(GCODEVIEWER_APP_NAME) + " - " + _L("The G-code file could not be opened"),
             wxCLOSE | wxICON_WARNING | wxCENTRE).ShowModal();
         return;
     }
@@ -25724,8 +25784,10 @@ void Plater::load_gcode(const wxString& filename)
     p->preview->get_canvas3d()->zoom_to_plate(0);
 
     if (p->preview->get_canvas3d()->get_gcode_layers_zs().empty()) {
-        MessageDialog(this, _L("The selected file") + ":\n" + filename + "\n" + _L("Does not contain valid G-code."),
-            wxString(GCODEVIEWER_APP_NAME) + " - " + _L("An Error has occurred while loading the G-code file."), wxCLOSE | wxICON_WARNING | wxCENTRE).ShowModal();
+        MessageDialog(this, _L("The selected file") + ":\n" + filename + "\n" +
+                                _L("Does not contain valid G-code: it holds no printable layers. It may be empty, cut short by "
+                                   "an interrupted export or transfer, or not a G-code file at all. Slice and export it again."),
+            wxString(GCODEVIEWER_APP_NAME) + " - " + _L("The G-code file could not be opened"), wxCLOSE | wxICON_WARNING | wxCENTRE).ShowModal();
         set_project_filename(DEFAULT_PROJECT_NAME);
     } else {
         set_project_filename(filename);
@@ -25844,7 +25906,9 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
 
         if (!open_zip_reader(&archive, archive_path.string())) {
             // TRN %1% is archive path
-            std::string err_msg = GUI::format(_u8L("Loading of a ZIP archive on path %1% has failed."), archive_path.string());
+            std::string err_msg = GUI::format(_u8L("The ZIP archive %1% could not be opened. It may be damaged, incompletely "
+                                                   "downloaded, or protected by a password. Download it again, or unpack it in "
+                                                   "Finder and import the models from it."), archive_path.string());
             throw Slic3r::FileIOError(err_msg);
         }
         mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
@@ -25896,7 +25960,10 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
                             mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
                             if (res == 0) {
                                 // TRN: First argument = path to file, second argument = error description
-                                wxString error_log = GUI::format_wxstr(_L("Failed to unzip file to %1%: %2%"), final_path.string(), mz_zip_get_error_string(mz_zip_get_last_error(&archive)));
+                                wxString error_log = GUI::format_wxstr(_L("A file from the ZIP archive could not be unpacked to %1%: %2%. "
+                                                                          "Make room on the disk, or unpack the archive in Finder and import "
+                                                                          "the models from it."),
+                                                                       final_path.string(), mz_zip_get_error_string(mz_zip_get_last_error(&archive)));
                                 BOOST_LOG_TRIVIAL(error) << error_log;
                                 show_error(nullptr, error_log);
                                 break;
@@ -25906,7 +25973,9 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
                             file.write(buffer.c_str(), buffer.size());
                             file.close();
                             if (!fs::exists(final_path)) {
-                                wxString error_log = GUI::format_wxstr(_L("Failed to find unzipped file at %1%. Unzipping of file has failed."), final_path.string());
+                                wxString error_log = GUI::format_wxstr(_L("A file unpacked from the ZIP archive is missing at %1%. Make room "
+                                                                          "on the disk, or unpack the archive in Finder and import the models "
+                                                                          "from it."), final_path.string());
                                 BOOST_LOG_TRIVIAL(error) << error_log;
                                 show_error(nullptr, error_log);
                                 break;
@@ -26204,7 +26273,8 @@ bool Plater::load_files(const wxArrayString& filenames)
     }
 
     if (!gcode_paths.empty()) {
-        show_info(this, _L("G-code files cannot be loaded with models together!"), _L("G-code loading"));
+        show_info(this, _L("G-code files and models cannot be opened together. Open the G-code on its own to preview it, or "
+                           "import only the models."), _L("G-code loading"));
         return false;
     }
 
@@ -26256,7 +26326,8 @@ bool Plater::load_files(const wxArrayString& filenames)
     if (this->m_only_gcode || this->m_exported_file) {
         if ((loadfiles_type == LoadFilesType::SingleOther)
             || (loadfiles_type == LoadFilesType::MultipleOther)) {
-            show_info(this, _L("Cannot add models when in preview mode!"), _L("Add Models"));
+            show_info(this, _L("Models cannot be added while a G-code file is open for preview. Start a new project (File > "
+                               "New Project) and add the models there."), _L("Add Models"));
             return false;
         }
     }
@@ -26939,7 +27010,8 @@ void Plater::export_gcode(bool prefer_removable)
             output_path = into_path(dlg.GetPath());
             while (has_illegal_filename_characters(output_path.filename().string())) {
                 show_error(this, _L("The provided file name is not valid.") + "\n" +
-                    _L("The following characters are not allowed by a FAT file system:") + " <>:/\\|?*\"");
+                    _L("It contains characters that USB drives and SD cards (FAT file system) don't allow, so the "
+                       "printer could not read the file. Remove these characters:") + " <>:/\\|?*\"");
                 dlg.SetFilename(from_path(output_path.filename()));
                 if (dlg.ShowModal() == wxID_OK)
                     output_path = into_path(dlg.GetPath());
@@ -27213,8 +27285,9 @@ int Plater::export_published_3mf(const std::vector<std::string>& published_keys,
     } catch (...) {
         restore_now();
         MessageDialog(this,
-                      _L("Failed to export the published 3MF file.\nPlease check whether the folder exists online or if other programs "
-                         "have the file open."),
+                      _L("The 3MF to publish could not be written.\n\n"
+                         "Why this can happen: the folder no longer exists, another app has the file open, or the disk is full.\n"
+                         "How to fix it: close the other app or make room on the disk, and publish again."),
                       _L("Publish"), wxOK | wxICON_WARNING)
             .ShowModal();
         return wxID_CANCEL;
@@ -27223,8 +27296,9 @@ int Plater::export_published_3mf(const std::vector<std::string>& published_keys,
     if (ret < 0) {
         restore_now();
         MessageDialog(this,
-                      _L("Failed to export the published 3MF file.\nPlease check whether the folder exists online or if other programs "
-                         "have the file open."),
+                      _L("The 3MF to publish could not be written.\n\n"
+                         "Why this can happen: the folder no longer exists, another app has the file open, or the disk is full.\n"
+                         "How to fix it: close the other app or make room on the disk, and publish again."),
                       _L("Publish"), wxOK | wxICON_WARNING)
             .ShowModal();
         return wxID_CANCEL;
@@ -27265,8 +27339,8 @@ TriangleMesh Plater::combine_mesh_fff(const ModelObject& mo, int instance_id, st
     bool has_splitable_volume = csg::model_to_csgmesh(mo, Transform3d::Identity(), std::back_inserter(csgmesh),
         csg::mpartsPositive | csg::mpartsNegative);
         
-    std::string fail_msg = _u8L("Unable to perform boolean operation on model meshes. "
-        "Only positive parts will be kept. You may fix the meshes and try again.");
+    std::string fail_msg = _u8L("Negative parts could not be subtracted from this object because its meshes are not closed "
+        "solids, so only the positive parts are kept. Repair the parts (right-click > Fix Model) and try again.");
     if (auto fail_reason_name = csg::check_csgmesh_booleans(Range{ std::begin(csgmesh), std::end(csgmesh) }); std::get<0>(fail_reason_name) != csg::BooleanFailReason::OK) {
         std::string name = std::get<1>(fail_reason_name);
         std::map<csg::BooleanFailReason, std::string> fail_reasons = {
@@ -27400,8 +27474,9 @@ void Plater::export_stl(bool extended, bool selection_only, bool multi_stls, Fil
 
         if (mesh.empty()) {
             get_notification_manager()->push_plater_error_notification(
-                _u8L("Unable to perform boolean operation on model meshes. "
-                     "Only positive parts will be exported."));
+                _u8L("Negative parts could not be subtracted from this object because its meshes are not closed "
+                     "solids, so only the positive parts are exported. Repair the parts (right-click > Fix Model) and "
+                     "export again."));
 
             for (const ModelVolume* v : mo.volumes)
                 if (v->is_model_part()) {
@@ -28045,7 +28120,9 @@ bool Plater::reslice()
         p->notification_manager->push_notification(
             NotificationType::FilamentIncompatibleMixed,
             NotificationManager::NotificationLevel::ErrorNotificationLevel,
-            into_u8(_L("Mixed filaments contain incompatible material types. Please correct the mixed filaments settings before slicing.")));
+            into_u8(_L("A mixed filament combines filaments of different material types (for example PLA with PETG), "
+                       "which don't bond and don't print at the same temperature. Change its component filaments to "
+                       "the same material type before slicing.")));
         reset_gcode_toolpaths();
         return true;
     }
@@ -28309,7 +28386,9 @@ int Plater::start_next_slice()
         p->notification_manager->push_notification(
             NotificationType::FilamentIncompatibleMixed,
             NotificationManager::NotificationLevel::ErrorNotificationLevel,
-            into_u8(_L("Mixed filaments contain incompatible material types. Please correct the mixed filaments settings before slicing.")));
+            into_u8(_L("A mixed filament combines filaments of different material types (for example PLA with PETG), "
+                       "which don't bond and don't print at the same temperature. Change its component filaments to "
+                       "the same material type before slicing.")));
 
         return -1;
     }
@@ -31159,8 +31238,10 @@ void Plater::validate_current_plate(bool& model_fits, bool& validate_error)
     model_fits = p->view3D->get_canvas3d()->check_volumes_outside_state() != ModelInstancePVS_Partly_Outside;
     validate_error = false;
     if (p->printer_technology == ptFFF) {
-        std::string plater_text = _u8L("An object is laid over the boundary of plate or exceeds the height limit.\n"
-                    "Please solve the problem by moving it totally on or off the plate, and confirming that the height is within the build volume.");;
+        std::string plater_text = _u8L("An object sticks out over the edge of the plate or is taller than the "
+                                       "printer can print.\nMove it completely onto the plate (or completely off it, "
+                                       "to leave it out of the print), and scale it down if it is taller than the "
+                                       "build volume.");;
         std::vector<StringObjectException> warnings;
         Polygons polygons;
         std::vector<std::pair<Polygon, float>> height_polygons;
@@ -32013,7 +32094,9 @@ bool Plater::PopupObjectTable(int object_id, int volume_id, const wxPoint& posit
     // mixed-filament columns are made for the U1.
     const TabPrinter* printer_tab = dynamic_cast<TabPrinter*>(wxGetApp().get_tab(Preset::TYPE_PRINTER));
     if (printer_tab != nullptr && printer_tab->m_extruders_count > 1) {
-        MessageDialog dlg(this, _L("Currently, the object configuration form cannot be used with a multiple-extruder printer."),
+        MessageDialog dlg(this, _L("On a printer with several tool heads, the speed columns of this table change the "
+                                   "speeds of the first tool head only. Click OK to open it anyway, or Cancel and "
+                                   "change the speeds in the process settings instead."),
                           _L("Not available"), wxOK | wxCANCEL | wxICON_WARNING);
         if (dlg.ShowModal() == wxID_CANCEL)
             return false;
@@ -32214,7 +32297,11 @@ void Plater::pop_warning_and_go_to_device_page(wxString printer_name, PrinterWar
                                        printer_name);
         } else {
             content = wxString::Format(
-                _L("Snapmaker Orca can't connect to %s. Please check if the printer is powered on and connected to the network."), printer_name);
+                _L("Snapmaker Orca cannot reach %s.\n\n"
+                   "Why this can happen: the printer is off or asleep, it is on another network than this Mac, its IP address "
+                   "changed, or macOS has not allowed this app to use the local network.\n"
+                   "How to fix it: check that the printer is on and on the same Wi-Fi, check its IP address on its screen, and "
+                   "allow Snapmaker Orca Mac under System Settings > Privacy & Security > Local Network."), printer_name);
         }
     } else if (type == PrinterWarningType::INCONSISTENT) {
         content = wxString::Format(_L("The currently connected printer on the device page is not %s. Please switch to %s before syncing."), printer_name, printer_name);
@@ -32327,7 +32414,8 @@ bool Plater::refresh_missing_plugin_block(bool* block_toggled)
     // local plugin by installing it or by changing the setting that needs it.
     update(NotificationType::OrcaLocalPluginMissingError, missing_local,
            &p->m_local_missing_shown_sig,
-           _u8L("Local plugins required by the current preset are missing:"),
+           _u8L("The current preset needs plugins that are not installed, so it can't slice. Install them, or change "
+                "the settings that use them:"),
            _u8L("Find plugins online"),
            [missing_local_refs](wxEvtHandler*) { open_missing_plugins_on_cloud(missing_local_refs); return false; });
 

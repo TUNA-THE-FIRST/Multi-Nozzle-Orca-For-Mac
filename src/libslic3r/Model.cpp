@@ -225,15 +225,19 @@ _finished:
             return empty_model;
         }
         case Step::Step_Status::LOAD_ERROR:
-            throw Slic3r::RuntimeError(_L("Loading of a model file failed."));
+            throw Slic3r::RuntimeError(_L("The model file could not be loaded: it may be damaged, incomplete, or in "
+                                          "a format this app can't read. Export it again from your design app, for "
+                                          "example as STL or 3MF."));
         case Step::Step_Status::MESH_ERROR:
-            throw Slic3r::RuntimeError(_L("Meshing of a model file failed or no valid shape."));
+            throw Slic3r::RuntimeError(_L("The CAD file could not be turned into a mesh: it holds no solid shape. "
+                                          "Export it again from your CAD app as a solid body, or as STL or 3MF."));
         default:
             break;
     }
 
     if (model.objects.empty())
-        throw Slic3r::RuntimeError(_L("The supplied file couldn\'t be read because it\'s empty."));
+        throw Slic3r::RuntimeError(_L("The file couldn\'t be read because it\'s empty (0 bytes): the download or "
+                                      "copy was probably interrupted. Get the file again."));
 
     for (ModelObject *o : model.objects)
         o->input_file = input_file;
@@ -388,7 +392,8 @@ Model Model::read_from_file(const std::string&                                  
         } else if (!message.empty()) {
             BOOST_LOG_TRIVIAL(error) << "Assimp: failed to load model: " << message
                                      << ", path=" << input_file;
-            message = _L("The file format is incompatible and cannot be parsed.");
+            message = _L("The file couldn't be read: its format version or contents aren't supported. Export it "
+                         "again as STL, OBJ or 3MF.");
         }
     }
     else if (boost::algorithm::iends_with(input_file, ".svg"))
@@ -419,7 +424,8 @@ Model Model::read_from_file(const std::string&                                  
     }
 #endif
     else
-        throw Slic3r::RuntimeError(_L("Unknown file format: input file must have .stl, .obj, or .amf(.xml) extension."));
+        throw Slic3r::RuntimeError(_L("This file type can't be opened here: it must be an .stl, .obj or .amf(.xml) "
+                                      "file. Export the model in one of these formats."));
 
     if (is_cb_cancel) {
         Model empty_model;
@@ -428,13 +434,16 @@ Model Model::read_from_file(const std::string&                                  
 
     if (!result) {
         if (message.empty())
-            throw Slic3r::RuntimeError(_L("Loading of a model file failed."));
+            throw Slic3r::RuntimeError(_L("The model file could not be loaded: it may be damaged, incomplete, or in "
+                                          "a format this app can't read. Export it again from your design app, for "
+                                          "example as STL or 3MF."));
         else
             throw Slic3r::RuntimeError(message);
     }
 
     if (model.objects.empty())
-        throw Slic3r::RuntimeError(_L("The supplied file couldn\'t be read because it\'s empty."));
+        throw Slic3r::RuntimeError(_L("The file couldn\'t be read because it\'s empty (0 bytes): the download or "
+                                      "copy was probably interrupted. Get the file again."));
 
     for (ModelObject *o : model.objects)
         o->input_file = input_file;
@@ -481,7 +490,8 @@ Model Model::read_from_archive(const std::string& input_file, DynamicPrintConfig
     else if (boost::algorithm::iends_with(input_file, ".zip.amf"))
         result = load_amf(input_file.c_str(), config, config_substitutions, &model, &is_bbl_3mf);
     else
-        throw Slic3r::RuntimeError(_L("Unknown file format: input file must have .3mf or .zip.amf extension."));
+        throw Slic3r::RuntimeError(_L("This file type can't be opened as a project: it must be a .3mf or .zip.amf "
+                                      "file."));
 
     if (out_file_type != En3mfType::From_Prusa) {
         if (is_orca_3mf)
@@ -491,7 +501,9 @@ Model Model::read_from_archive(const std::string& input_file, DynamicPrintConfig
     }
 
     if (!result)
-        throw Slic3r::RuntimeError(_L("Loading of a model file failed."));
+        throw Slic3r::RuntimeError(_L("The model file could not be loaded: it may be damaged, incomplete, or in a "
+                                      "format this app can't read. Export it again from your design app, for example "
+                                      "as STL or 3MF."));
 
     for (ModelObject *o : model.objects) {
 //        if (boost::algorithm::iends_with(input_file, ".zip.amf"))

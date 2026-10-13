@@ -905,14 +905,18 @@ void FlashforgePrintHostSendDialog::load_slots()
     m_supports_material_station = false;
 
     if (m_host == nullptr) {
-        m_status_text->SetLabel(_L("Flashforge host is not available."));
+        m_status_text->SetLabel(_L("The printer's connection could not be set up, so its material station can't be "
+                                   "read. Check the printer's connection settings (\"Connect to printer\" at the right "
+                                   "of the printer list)."));
         return;
     }
 
     wxString msg;
     bool     supports_material_station = false;
     if (!m_host->fetch_material_slots(m_slots, &supports_material_station, msg)) {
-        m_status_text->SetLabel(msg.empty() ? _L("Unable to read IFS slots from printer.") : msg);
+        m_status_text->SetLabel(msg.empty() ? _L("The material station (IFS) slots could not be read from the "
+                                                 "printer. Check that the printer is on and connected, then open "
+                                                 "this window again.") : msg);
         return;
     }
 
@@ -1073,7 +1077,8 @@ bool FlashforgePrintHostSendDialog::slot_matches_filament(const Slic3r::Flashfor
 bool FlashforgePrintHostSendDialog::validate_before_close()
 {
     if (!m_use_material_station && m_project_filaments.size() > 1) {
-        show_error(this, _L("This plate uses multiple materials. Enable IFS and assign each tool to a printer slot."));
+        show_error(this, _L("This plate prints with several filaments, which the printer can only load from its "
+                            "material station (IFS). Check \"Enable IFS\" and choose a slot for each filament."));
         return false;
     }
 
@@ -1083,19 +1088,22 @@ bool FlashforgePrintHostSendDialog::validate_before_close()
     for (const auto& row : m_mapping_rows) {
         auto* card = as_ff_map_widget(row.card);
         if (card == nullptr || !card->is_slot_selected()) {
-            show_error(this, _L("Each project material must be assigned to an IFS slot before printing."));
+            show_error(this, _L("A filament of this plate has no material station (IFS) slot yet. Choose a slot for "
+                                "every filament in the list."));
             return false;
         }
 
         const auto*       slot         = find_slot_by_id(std::to_string(card->selected_slot_id()));
         const auto*       filament     = find_filament_by_tool_id(row.tool_id);
         if (slot == nullptr || filament == nullptr || !slot->has_filament) {
-            show_error(this, _L("Each project material must be assigned to a loaded IFS slot before printing."));
+            show_error(this, _L("A filament of this plate is assigned to an empty material station (IFS) slot. Load "
+                                "filament in that slot on the printer, or choose a loaded slot."));
             return false;
         }
 
         if (!slot_matches_filament(*slot, *filament)) {
-            show_error(this, _L("Each project material must match the material loaded in the selected IFS slot."));
+            show_error(this, _L("A filament of this plate is assigned to a slot holding another material. Choose a "
+                                "slot with the same material, or change the filament in the project."));
             return false;
         }
     }
@@ -1424,7 +1432,7 @@ void PrintHostQueueDialog::on_error(Event &evt)
 
     set_state(evt.job_id, ST_ERROR);
 
-    auto errormsg = format_wxstr("%1%\n%2%", _L("Error uploading to print host") + ":", evt.status);
+    auto errormsg = format_wxstr("%1%\n%2%", _L("The file could not be sent to the printer") + ":", evt.status);
     job_list->SetValue(wxVariant(0), evt.job_id, COL_PROGRESS);
     job_list->SetValue(wxVariant(errormsg), evt.job_id, COL_ERRORMSG);    // Stashes the error message into a hidden column for later
 

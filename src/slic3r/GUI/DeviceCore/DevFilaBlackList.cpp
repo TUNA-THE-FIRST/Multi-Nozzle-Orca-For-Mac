@@ -274,11 +274,12 @@ void check_filaments(const DevFilaBlacklist::CheckFilamentInfo& check_info, DevF
             continue;
 
             // Error in description
-            L("TPU is not supported by AMS.");
+            L("TPU is too soft to be fed through the AMS. Feed it from the external spool holder instead.");
             L("AMS does not support 'Bambu Lab PET-CF'.");
             L("The current filament doesn't support the E3D high-flow nozzle and can't be used.");
             L("The current filament doesn't support the TPU high-flow nozzle and can't be used.");
-            L("Auto dynamic flow calibration is not supported for TPU filament.");
+            L("Automatic flow dynamics calibration doesn't work with TPU. Turn off Flow Dynamics Calibration when "
+              "sending the print.");
             L("Bambu TPU 85A is not supported for printing with 0.4 mm Standard or High Flow nozzles.");
 
             // Warning in description

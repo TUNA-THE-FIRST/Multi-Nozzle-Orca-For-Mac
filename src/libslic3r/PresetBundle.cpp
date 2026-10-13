@@ -4541,7 +4541,9 @@ unsigned int PresetBundle::sync_ams_list(std::vector<std::pair<DynamicPrintConfi
                     ams_filament_colors.push_back(filament_color);
                     ams_filament_color_types.push_back(filament_color_type);
                     ams_multi_color_filment.push_back(filament_multi_color);
-                    unknowns.emplace_back(&ams, has_type ? L("The filament may not be compatible with the current machine settings. Generic filament presets will be used.") :
+                    unknowns.emplace_back(&ams, has_type ? L("The filament is made for another printer or nozzle, so "
+                                                             "a generic filament preset is used instead. Choose a "
+                                                             "filament made for this printer in the filament list.") :
                                                            L("The filament model is unknown. Still using the previous filament preset."));
                     continue;
                 }
@@ -4557,7 +4559,9 @@ unsigned int PresetBundle::sync_ams_list(std::vector<std::pair<DynamicPrintConfi
                     continue;
             }
             unknowns.emplace_back(&ams, boost::algorithm::starts_with(iter->name, filament_type) ?
-                                            (has_type ? L("The filament may not be compatible with the current machine settings. Generic filament presets will be used.") :
+                                            (has_type ? L("The filament is made for another printer or nozzle, so a "
+                                                          "generic filament preset is used instead. Choose a "
+                                                          "filament made for this printer in the filament list.") :
                                                         L("The filament model is unknown. Generic filament presets will be used.")) :
                                             (has_type ? L("The filament may not be compatible with the current machine settings. A random filament preset will be used.") :
                                                         L("The filament model is unknown. A random filament preset will be used.")));
