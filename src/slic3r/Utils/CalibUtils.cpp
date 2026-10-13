@@ -400,14 +400,14 @@ CalibMode CalibUtils::get_calib_mode_by_name(const std::string name, int& cali_s
 bool CalibUtils::validate_input_name(wxString name)
 {
     if (name.Length() > 40) {
-        MessageDialog msg_dlg(nullptr, _L("The name cannot exceed 40 characters."), wxEmptyString, wxICON_WARNING | wxOK);
+        MessageDialog msg_dlg(nullptr, _L("The name is too long: use at most 40 characters."), wxEmptyString, wxICON_WARNING | wxOK);
         msg_dlg.ShowModal();
         return false;
     }
 
     name.erase(std::remove(name.begin(), name.end(), L' '), name.end());
     if (name.IsEmpty()) {
-        MessageDialog msg_dlg(nullptr, _L("The name cannot be empty."), wxEmptyString, wxICON_WARNING | wxOK);
+        MessageDialog msg_dlg(nullptr, _L("Enter a name."), wxEmptyString, wxICON_WARNING | wxOK);
         msg_dlg.ShowModal();
         return false;
     }
@@ -1821,7 +1821,8 @@ void CalibUtils::send_to_print(const CalibInfo &calib_info, wxString &error_mess
     }
 
     if (obj_->is_in_upgrading()) {
-        error_message = _L("Cannot send a print job while the printer is updating firmware.");
+        error_message = _L("The print can't be sent while the printer is updating its firmware. Wait until the "
+                           "update has finished (the printer's screen shows it), then send it again.");
         return;
     }
     else if (obj_->is_system_printing()) {
@@ -1929,7 +1930,8 @@ void CalibUtils::send_to_print(const std::vector<CalibInfo> &calib_infos, wxStri
     }
 
     if (obj_->is_in_upgrading()) {
-        error_message = _L("Cannot send a print job while the printer is updating firmware.");
+        error_message = _L("The print can't be sent while the printer is updating its firmware. Wait until the "
+                           "update has finished (the printer's screen shows it), then send it again.");
         return;
     } else if (obj_->is_system_printing()) {
         error_message = _L("The printer is executing instructions. Please restart printing after it ends.");
