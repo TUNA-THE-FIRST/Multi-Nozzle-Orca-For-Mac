@@ -906,7 +906,7 @@ void FlashforgePrintHostSendDialog::load_slots()
 
     if (m_host == nullptr) {
         m_status_text->SetLabel(_L("The printer's connection could not be set up, so its material station can't be "
-                                   "read. Check the printer's connection settings ("Connect to printer" at the right "
+                                   "read. Check the printer's connection settings (\"Connect to printer\" at the right "
                                    "of the printer list)."));
         return;
     }
