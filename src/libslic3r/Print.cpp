@@ -4510,8 +4510,9 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
                                                 "these settings. This happens with walls or parts thinner than the line width "
                                                 "(about the nozzle size), or a model scaled down too far.\n"
                                                 "How to fix it: make the thin parts thicker or scale the model up, or use a "
-                                                "smaller nozzle. A lower Minimum feature size (Quality > Wall generator) can "
-                                                "also let thin walls print."));
+                                                "smaller nozzle. With the Arachne wall generator, a lower Minimum feature size "
+                                                "(Quality > Wall generator, Advanced mode) can also let thin walls print; with "
+                                                "Classic, turn on Detect thin walls."));
 
         }
         this->set_done(psWipeTower);

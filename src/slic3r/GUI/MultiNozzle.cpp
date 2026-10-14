@@ -74,13 +74,16 @@ wxString nozzle_display_name(size_t head, size_t count)
 // is not 0), translated. Not lowercased: that would break translations such as German nouns.
 static wxString feature_list(const ToolHeadUse &use, double height, unsigned int every = 0)
 {
-    wxString list;
+    wxString              list;
+    std::vector<wxString> names; // exact names: a translation can be part of another ("Füllung")
     for (const ToolHeadFeatureUse &feature : use.features) {
         if (std::abs(feature.height - height) > EPSILON || (every != 0 && feature.every != every))
             continue;
         const wxString name = _(wxString::FromUTF8(feature.feature));
-        if (!list.Contains(name))
-            list += (list.empty() ? "" : ", ") + name;
+        if (std::find(names.begin(), names.end(), name) != names.end())
+            continue;
+        names.push_back(name);
+        list += (list.empty() ? "" : ", ") + name;
     }
     return list;
 }
@@ -129,8 +132,9 @@ std::vector<wxString> tool_head_warnings(const ToolHeadUses &uses, const std::ve
                                                 name, mm_number(use.preferred)));
             continue;
         }
-        double thickest = 0., thinnest = 0., thickest_own = 0.;
-        bool   prints_preferred = false;
+        double       thickest = 0., thinnest = 0., thickest_own = 0.;
+        unsigned int thickest_own_every = 1;
+        bool         prints_preferred = false;
         for (const ToolHeadFeatureUse &feature : use.features) {
             if (feature.height <= EPSILON)
                 continue;
@@ -138,8 +142,10 @@ std::vector<wxString> tool_head_warnings(const ToolHeadUses &uses, const std::ve
             thinnest = thinnest <= 0. ? feature.height : std::min(thinnest, feature.height);
             prints_preferred |= std::abs(feature.height - use.preferred) < EPSILON;
             // Infill combination's height is the engine's own rule, capped at the nozzles: no warning.
-            if (!feature.combined)
-                thickest_own = std::max(thickest_own, feature.height);
+            if (!feature.combined && feature.height > thickest_own) {
+                thickest_own       = feature.height;
+                thickest_own_every = feature.every;
+            }
         }
         if (thickest <= 0.)
             continue; // supports only
@@ -147,11 +153,11 @@ std::vector<wxString> tool_head_warnings(const ToolHeadUses &uses, const std::ve
             wxString text = format_wxstr(_L("%1% prints %2% in %3% mm layers, thicker than its %4% mm nozzle prints well (about "
                                             "3/4 of the nozzle at most): the lines may not stick to each other."),
                                          name, feature_list(use, thickest_own), mm_number(thickest_own), mm_number(use.nozzle));
-            if (thickest_own <= uses.grid + EPSILON)
-                // The object layer height itself is too thick for this nozzle.
+            if (thickest_own_every <= 1)
+                // Printed on every layer of its object: that object's layer height is too thick for this nozzle.
                 text += " " + format_wxstr(_L("The object layer height, %1% mm, is already that thick: choose a thinner layer "
                                               "height in the process settings, or a larger nozzle."),
-                                           mm_number(uses.grid));
+                                           mm_number(thickest_own));
             else if (use.preferred <= EPSILON)
                 text += " " + format_wxstr(_L("This happens because %1% has no layer height of its own: it then follows the "
                                               "coarser nozzle it shares these parts with. Give it its own layer height (the "
@@ -483,14 +489,19 @@ MultiNozzleSetupDialog::MultiNozzleSetupDialog(wxWindow *parent)
 // with its buttons, the body scrolls.
 void MultiNozzleSetupDialog::fit_to_screen()
 {
-    const int     display_index = wxDisplay::GetFromWindow(this);
-    const wxRect  area          = wxDisplay(display_index == wxNOT_FOUND ? 0u : unsigned(display_index)).GetClientArea();
-    const wxSize  content       = m_body->GetSizer()->CalcMin();
-    const int     scrollbar     = wxSystemSettings::GetMetric(wxSYS_VSCROLL_X, this);
+    // Until it is shown, the dialog is not on the screen it will open on: its parent is.
+    int display_index = wxDisplay::GetFromWindow(IsShown() || GetParent() == nullptr ? static_cast<wxWindow *>(this) : GetParent());
+    const wxRect area    = wxDisplay(display_index == wxNOT_FOUND ? 0u : unsigned(display_index)).GetClientArea();
+    const wxSize content = m_body->GetSizer()->CalcMin();
+    const int    scrollbar = wxSystemSettings::GetMetric(wxSYS_VSCROLL_X, this);
     m_body->SetMinSize({content.x + scrollbar, std::min(content.y, area.GetHeight() * 3 / 4)});
     m_body->FitInside();
     Layout();
     Fit();
+    // Growing keeps the top edge: move up when the buttons would go below the screen.
+    if (IsShown())
+        if (const wxRect rect = GetScreenRect(); rect.GetBottom() > area.GetBottom())
+            Move(rect.GetX(), std::max(area.GetTop(), area.GetBottom() - rect.GetHeight()));
 }
 
 // The label of a filament in the feature lists: the nozzle that prints it.

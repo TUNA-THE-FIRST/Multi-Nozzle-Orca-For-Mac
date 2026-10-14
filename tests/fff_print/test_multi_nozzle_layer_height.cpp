@@ -3027,9 +3027,10 @@ std::unique_ptr<U1Slice> slice_u1_recipe(const U1Recipe &recipe)
     std::vector<TriangleMesh> meshes;
     if (!recipe.meshes.empty()) {
         // Side by side along X, centered on the bed.
-        float x = 135.5f - 0.5f * std::accumulate(recipe.meshes.begin(), recipe.meshes.end(), 0.f, [&recipe](float w, const TriangleMesh &m) {
-                      return w + float(m.bounding_box().size().x()) + recipe.gap;
-                  });
+        const float total = std::accumulate(recipe.meshes.begin(), recipe.meshes.end(), 0.f, [&recipe](float w, const TriangleMesh &m) {
+                                return w + float(m.bounding_box().size().x()) + recipe.gap;
+                            }) - recipe.gap;
+        float x = 135.5f - 0.5f * total;
         for (TriangleMesh m : recipe.meshes) {
             const BoundingBoxf3 box = m.bounding_box();
             m.translate(float(x - box.min.x()), float(136. - box.center().y()), float(-box.min.z()));
@@ -3371,10 +3372,10 @@ TEST_CASE("On a U1 an object on another filament prints its Default features wit
     check_summary_matches_gcode(*slice);
 }
 
-TEST_CASE("On a U1 the coarse height the setup dialog chooses prints the sparse infill every fourth layer", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
+TEST_CASE("On a U1 a 0.48 mm coarse height on the 0.8 mm nozzle prints the sparse infill every fourth layer", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
 {
-    // The dialog gives the 0.8 mm nozzle the thickest multiple of 0.12 mm it prints well: 0.48 mm, within
-    // the 0.8 mm size preset's 0.56 mm maximum and 3/4 of the nozzle.
+    // The height the setup dialog chooses for the 0.8 mm nozzle on 0.12 mm object layers (the thickest
+    // multiple within the size preset's 0.56 mm maximum and 3/4 of the nozzle), set here by hand.
     U1Recipe recipe  = u1_dialog_recipe({{"sparse_infill_filament_id", 2}});
     recipe.preferred = {0.12, 0.48, 0., 0.};
     recipe.height    = 12.f;

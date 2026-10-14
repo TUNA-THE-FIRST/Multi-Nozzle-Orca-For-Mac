@@ -13877,8 +13877,8 @@ void Sidebar::sync_ams_list(bool is_from_big_sync_btn)
     wxGetApp().app_config ->set("ams_filament_ids", p->ams_list_device, ams_filament_ids);
     if (!unknowns.empty()) {
         MessageDialog dlg(this,
-            _L("Some filaments in the AMS are not known to this app, so their slots got the closest preset this app has; "
-               "the details below say which preset each slot uses now.\n\n"
+            _L("Some filaments in the AMS are not known to this app, so their slots were given another preset; the details "
+               "below say how each slot was set.\n\n"
                "Why this can happen: the filaments are newer than the app's filament list, or they are third-party "
                "filaments without a preset.\n"
                "How to fix it: reopen the app to fetch updated presets, or pick the right preset for each slot by hand "
