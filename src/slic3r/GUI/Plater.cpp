@@ -2738,11 +2738,15 @@ private:
             } else {
                 m_error_label->SetLabel(wxEmptyString);
             }
+            // Wrapped to the dialog's width, which then grows to show it: one line would be cut off.
+            m_error_label->Wrap(FromDIP(390));
         }
         if (wxWindow* ok_button = FindWindow(wxID_OK))
             ok_button->Enable(valid && !m_recipe_loading && !m_recipe_refresh_pending);
 
         Layout();
+        if (m_error_label && !m_error_label->GetLabel().empty() && GetBestSize().GetHeight() > GetSize().GetHeight())
+            Fit();
     }
 
 private:
@@ -13873,8 +13877,8 @@ void Sidebar::sync_ams_list(bool is_from_big_sync_btn)
     wxGetApp().app_config ->set("ams_filament_ids", p->ams_list_device, ams_filament_ids);
     if (!unknowns.empty()) {
         MessageDialog dlg(this,
-            _L("Some filaments in the AMS are not known to this app, so they were set to a generic preset of the same "
-               "material.\n\n"
+            _L("Some filaments in the AMS are not known to this app, so their slots got the closest preset this app has; "
+               "the details below say which preset each slot uses now.\n\n"
                "Why this can happen: the filaments are newer than the app's filament list, or they are third-party "
                "filaments without a preset.\n"
                "How to fix it: reopen the app to fetch updated presets, or pick the right preset for each slot by hand "
@@ -20205,9 +20209,9 @@ void Plater::priv::reload_from_disk()
 #endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
     if (!fail_list.empty()) {
-        wxString message = _L("These could not be reloaded from disk because their source files were moved, renamed, "
-                              "deleted or can no longer be read. Right-click each one > Replace 3D file... to point it to "
-                              "the file's new location:") + "\n";
+        wxString message = _L("These could not be reloaded from disk: their file no longer contains a matching object or part "
+                              "(parts were renamed, removed or reordered in the design app). Right-click each one > Replace "
+                              "3D file... to load the new file in its place:") + "\n";
         for (const wxString& s : fail_list) {
             message += s + "\n";
         }
@@ -24380,8 +24384,8 @@ void Plater::import_model_id(wxString download_info)
         //check file suffix
         wxString extension = fs::path(filename.wx_str()).extension().c_str();
         if (!extension.Contains(".3mf")) {
-            msg = _L("The downloaded file is not a model or project this app can open (3MF, STL, STEP, OBJ...). Download it in "
-                     "your browser and check what it contains.");
+            msg = _L("Only 3MF projects can be opened from a link. Download the file in your browser and import it "
+                     "with File > Import.");
             return;
         }
 
@@ -27367,8 +27371,8 @@ TriangleMesh Plater::combine_mesh_fff(const ModelObject& mo, int instance_id, st
     bool has_splitable_volume = csg::model_to_csgmesh(mo, Transform3d::Identity(), std::back_inserter(csgmesh),
         csg::mpartsPositive | csg::mpartsNegative);
         
-    std::string fail_msg = _u8L("Negative parts could not be subtracted from this object because its meshes are not closed "
-        "solids, so only the positive parts are kept. Repair the parts (right-click > Fix Model) and try again.");
+    std::string fail_msg = _u8L("The negative parts could not be subtracted from this object, so only its positive parts are "
+        "kept. If a part is damaged (open or self-intersecting), repair it (right-click > Fix Model) and try again.");
     if (auto fail_reason_name = csg::check_csgmesh_booleans(Range{ std::begin(csgmesh), std::end(csgmesh) }); std::get<0>(fail_reason_name) != csg::BooleanFailReason::OK) {
         std::string name = std::get<1>(fail_reason_name);
         std::map<csg::BooleanFailReason, std::string> fail_reasons = {
@@ -27502,8 +27506,8 @@ void Plater::export_stl(bool extended, bool selection_only, bool multi_stls, Fil
 
         if (mesh.empty()) {
             get_notification_manager()->push_plater_error_notification(
-                _u8L("Negative parts could not be subtracted from this object because its meshes are not closed "
-                     "solids, so only the positive parts are exported. Repair the parts (right-click > Fix Model) and "
+                _u8L("The negative parts could not be subtracted from this object, so only its positive parts are "
+                     "exported. If a part is damaged (open or self-intersecting), repair it (right-click > Fix Model) and "
                      "export again."));
 
             for (const ModelVolume* v : mo.volumes)

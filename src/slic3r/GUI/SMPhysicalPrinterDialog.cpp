@@ -190,8 +190,8 @@ void SMPhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_opt
         m_printhost_logout_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
             std::unique_ptr<PrintHost> host(PrintHost::get_print_host(m_config));
             if (!host) {
-                const wxString text = _L("This host type is not supported, so the connection can't be tested. Choose "
-                                         "another host type for this printer.");
+                const wxString text = _L("This host type is not supported, so this can't be done. Choose another host "
+                                         "type for this printer.");
                 show_error(this, text);
                 return;
             }

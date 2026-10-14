@@ -4506,7 +4506,12 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
             m_tool_ordering = ToolOrdering(*this, -1, false);
             m_tool_ordering.sort_and_build_data(*this, -1, false);
             if (m_tool_ordering.empty() || m_tool_ordering.last_extruder() == unsigned(-1))
-                throw Slic3r::SlicingError("The print is empty. The model is not printable with current print settings.");
+                throw Slic3r::SlicingError(_u8L("Nothing to print: no part of the model is thick enough to make a line with "
+                                                "these settings. This happens with walls or parts thinner than the line width "
+                                                "(about the nozzle size), or a model scaled down too far.\n"
+                                                "How to fix it: make the thin parts thicker or scale the model up, or use a "
+                                                "smaller nozzle. A lower Minimum feature size (Quality > Wall generator) can "
+                                                "also let thin walls print."));
 
         }
         this->set_done(psWipeTower);

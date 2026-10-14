@@ -483,12 +483,7 @@ void MediaFilePanel::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
         m_image_grid->SetStatus(m_bmp_failed, _L("Please enter the IP of the printer to connect."));
         fs->SetUrl("0");
         fs.reset();
-        if (wxGetApp().show_modal_ip_address_enter_dialog(false, _L("The printer's storage could not be opened over "
-                                                                    "the local network: the printer may be off or on "
-                                                                    "another network, or macOS blocked the "
-                                                                    "connection. Check that it is on and on the same "
-                                                                    "Wi-Fi, and allow this app under System Settings "
-                                                                    "> Privacy & Security > Local Network."))) {
+        if (wxGetApp().show_modal_ip_address_enter_dialog(false, _L("LAN Connection Failed (Failed to view sdcard)"))) {
             if (auto fs = wfs.lock())
                 fs->Retry();
         }

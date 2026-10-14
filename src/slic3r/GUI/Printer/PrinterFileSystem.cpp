@@ -52,8 +52,8 @@ static wxBitmap default_thumbnail;
 
 static std::map<int, std::string> error_messages = {
      {PrinterFileSystem::ERROR_PIPE, L("Reconnecting the printer, the operation cannot be completed immediately, please try again later.")},
-     {PrinterFileSystem::ERROR_RES_BUSY, L("The printer is already connected to too many apps (for example Bambu "
-                                           "Handy or another computer). Close the other connections, or wait a "
+     {PrinterFileSystem::ERROR_RES_BUSY, L("The printer is already connected to too many apps\n(for example Bambu "
+                                           "Handy or another computer).\nClose the other connections, or wait a "
                                            "minute, and try again.")},
      {PrinterFileSystem::ERROR_TIME_OUT, L("Timeout, please try again.")},
      {PrinterFileSystem::FILE_NO_EXIST, L("File does not exist.")},

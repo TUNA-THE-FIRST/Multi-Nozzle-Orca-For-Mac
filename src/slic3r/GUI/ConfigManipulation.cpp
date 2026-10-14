@@ -312,10 +312,8 @@ bool ConfigManipulation::check_layer_height(DynamicPrintConfig* config)
     const double layer_height = config->opt_float("layer_height");
 
     if (min_layer_height > EPSILON && layer_height < EPSILON) {
-        const wxString msg_text = wxString::Format(_L("The layer height is below the minimum the nozzle prints "
-                                                      "reliably. It is set to the minimum (%g mm); to print thinner "
-                                                      "layers, lower the minimum layer height in the printer "
-                                                      "settings (Extruder) first."), min_layer_height);
+        const wxString msg_text = wxString::Format(_L("A layer height of 0 can't be printed, so it is set to the "
+                                                      "printer's minimum layer height (%g mm)."), min_layer_height);
         MessageDialog dialog(wxGetApp().plater(), msg_text, "", wxICON_WARNING | wxOK);
         dialog.SetButtonLabel(wxID_OK, _L("OK"));
         is_msg_dlg_already_exist = true;

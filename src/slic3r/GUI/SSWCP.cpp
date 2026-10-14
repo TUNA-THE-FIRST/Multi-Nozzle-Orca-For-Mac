@@ -5182,7 +5182,7 @@ void cancel_all_active_timelapse()
             release_date_index(ctx->files[i].date_index);
             if (ctx->popup && !ctx->popup->IsBeingDeleted()) {
                 ctx->popup->mark_task_error(ctx->row_offset + i,
-                    std::string(_L("The printer disconnected before this file was transferred. Reconnect it and try again.").ToUTF8().data()));
+                    std::string(_L("Device disconnected.").ToUTF8().data()));
             }
         }
     }
@@ -5838,7 +5838,7 @@ void SSWCP_UserLogin_Instance::sw_DownLoadFile()
                     // Always show a single friendly message — never expose the
                     // raw Http error string to the UI.
                     ctx->popup->mark_task_error(global_row,
-                        std::string(_L("The file could not be downloaded: the connection to the printer or the internet dropped, or the file is no longer available. Check the connection and try again.").ToUTF8().data()));
+                        std::string(_L("Failed to download the file. Please check your network and try again.").ToUTF8().data()));
                 }
 
                 push_file_state(ctx, idx, "failed");

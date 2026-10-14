@@ -1,5 +1,7 @@
 #include "PrintHost.hpp"
 
+#include <set>
+
 #include <vector>
 #include <thread>
 #include <exception>
@@ -204,7 +206,8 @@ wxString PrintHost::http_status_hint(unsigned status)
     case 409:
         return _L("The printer is busy, printing or handling another file. Wait until it is idle and try again.");
     case 413:
-        return _L("The file is larger than the printer accepts. Free some space on the printer and try again.");
+        return _L("The file is larger than the printer accepts in one upload. Raise the upload size limit in the printer's "
+                  "web server settings, or make the file smaller, for example with fewer objects on the plate.");
     case 400:
     case 415:
         return _L("The printer did not accept the request. Check that the host type matches the printer's software, and update "
@@ -218,14 +221,26 @@ wxString PrintHost::http_status_hint(unsigned status)
     }
 }
 
+// A reason phrase that only names the status ("Forbidden"), saying nothing of the cause.
+static bool is_bare_reason_phrase(const std::string &reason)
+{
+    static const std::set<std::string> phrases = {"Bad Request", "Unauthorized", "Forbidden", "Not Found", "Conflict",
+                                                  "Payload Too Large", "Request Entity Too Large", "Unsupported Media Type",
+                                                  "Internal Server Error", "Bad Gateway", "Service Unavailable", "Gateway Timeout"};
+    return phrases.count(reason) > 0;
+}
+
 wxString PrintHost::format_error(const std::string &body, const std::string &error, unsigned status) const
 {
     if (status != 0) {
         const std::string reason = moonraker_error_reason(body);
         auto wxbody = wxString::FromUTF8(reason.empty() ? body : reason);
         wxString message = wxString::Format("HTTP %u: %s", status, wxbody);
-        if (const wxString hint = http_status_hint(status); !hint.empty())
-            message += "\n\n" + hint;
+        // The printer's own reason ("File is loaded, upload not permitted", "No space left on device")
+        // says more than any general advice for its status, which could even point the wrong way.
+        if (reason.empty() || is_bare_reason_phrase(reason))
+            if (const wxString hint = http_status_hint(status); !hint.empty())
+                message += "\n\n" + hint;
         return message;
     }
     // The causes shared by every way of not reaching the printer at all.

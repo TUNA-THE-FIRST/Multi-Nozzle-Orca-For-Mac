@@ -236,8 +236,9 @@ _finished:
     }
 
     if (model.objects.empty())
-        throw Slic3r::RuntimeError(_L("The file couldn\'t be read because it\'s empty (0 bytes): the download or "
-                                      "copy was probably interrupted. Get the file again."));
+        throw Slic3r::RuntimeError(_L("The file contains no model to load: it is empty, or holds no geometry (only "
+                                      "settings, for example). If it should hold a model, the download or copy was "
+                                      "probably interrupted: get the file again."));
 
     for (ModelObject *o : model.objects)
         o->input_file = input_file;
@@ -442,8 +443,9 @@ Model Model::read_from_file(const std::string&                                  
     }
 
     if (model.objects.empty())
-        throw Slic3r::RuntimeError(_L("The file couldn\'t be read because it\'s empty (0 bytes): the download or "
-                                      "copy was probably interrupted. Get the file again."));
+        throw Slic3r::RuntimeError(_L("The file contains no model to load: it is empty, or holds no geometry (only "
+                                      "settings, for example). If it should hold a model, the download or copy was "
+                                      "probably interrupted: get the file again."));
 
     for (ModelObject *o : model.objects)
         o->input_file = input_file;

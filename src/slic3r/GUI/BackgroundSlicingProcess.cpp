@@ -991,11 +991,12 @@ void BackgroundSlicingProcess::prepare_upload()
             m_print->set_status(95, _utf8(L("Running post-processing scripts")));
             std::string error_message;
             if (copy_file(m_temp_output_path, source_path.string(), error_message) != SUCCESS)
-                throw Slic3r::RuntimeError(_utf8(L("The post-processed G-code could not be copied for upload.\n\n"
-                                                   "Why this can happen: the post-processing script removed or renamed its output, "
-                                                   "or the disk is full.\n"
-                                                   "How to fix it: check the script in the process settings under Others > "
-                                                   "Post-processing Scripts, make room on the disk, and slice again.")));
+                throw Slic3r::RuntimeError(GUI::format(_u8L("The sliced G-code could not be copied to a temporary file for the "
+                                                       "upload: %1%\n\n"
+                                                       "Why this can happen: the disk is full, or the temporary folder can't be "
+                                                       "written to.\n"
+                                                       "How to fix it: make room on the disk and send the print again."),
+                                                  error_message));
             m_upload_job.upload_data.upload_path = m_fff_print->print_statistics().finalize_output_path(
                 m_upload_job.upload_data.upload_path.string());
             // Orca: skip post-processing scripts for BBL printers as we have run them already in finalize_gcode()

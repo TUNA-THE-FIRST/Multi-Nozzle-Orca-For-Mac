@@ -273,8 +273,8 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
         m_printhost_generate_creds_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
             std::unique_ptr<PrintHost> host(PrintHost::get_print_host(m_config));
             if (!host) {
-                const wxString text = _L("This host type is not supported, so the connection can't be tested. Choose "
-                                         "another host type for this printer.");
+                const wxString text = _L("This host type is not supported, so this can't be done. Choose another host "
+                                         "type for this printer.");
                 show_error(this, text);
                 return;
             }
@@ -310,8 +310,8 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
         m_printhost_logout_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
             std::unique_ptr<PrintHost> host(PrintHost::get_print_host(m_config));
             if (!host) {
-                const wxString text = _L("This host type is not supported, so the connection can't be tested. Choose "
-                                         "another host type for this printer.");
+                const wxString text = _L("This host type is not supported, so this can't be done. Choose another host "
+                                         "type for this printer.");
                 show_error(this, text);
                 return;
             }
@@ -838,7 +838,7 @@ void PhysicalPrinterDialog::update_printers()
     } catch (const HostNetworkError &err) {
         printers.clear();
         show_error(this, _L("The list of printers could not be read from the print host. Check that the print host "
-                            "is running and reachable from this Mac, then click Refresh Printers again.") + "\n\n" + from_u8(err.what()));
+                            "is running and reachable from this Mac, then click Refresh again.") + "\n\n" + from_u8(err.what()));
     }
     Choice *choice = dynamic_cast<Choice*>(rs);
     choice->set_values(printers);
