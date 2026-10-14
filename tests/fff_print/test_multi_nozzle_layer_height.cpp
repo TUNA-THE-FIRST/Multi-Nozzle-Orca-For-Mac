@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <map>
 #include <memory>
+#include <numeric>
 #include <set>
 #include <sstream>
 #include <string>
@@ -2900,6 +2901,10 @@ struct U1Recipe
     bool                                     prime_tower = false;
     int                                      support_filament = 0; // > 0: supports on, printed with it
     float                                    height      = 6.f; // of the 20 x 20 mm cube
+    std::vector<TriangleMesh>                meshes;   // printed instead of the cube, one object each
+    std::vector<int>                         object_filaments; // per mesh; object_filament when empty
+    float                                    gap = 10.f; // between the meshes, mm
+    std::vector<std::pair<std::string, std::string>> settings; // further process settings
 };
 
 struct U1Extrusion
@@ -3015,20 +3020,37 @@ std::unique_ptr<U1Slice> slice_u1_recipe(const U1Recipe &recipe)
         config.set_key_value("support_filament", new ConfigOptionInt(recipe.support_filament));
         config.set_key_value("support_interface_filament", new ConfigOptionInt(recipe.support_filament));
     }
+    for (const auto &[key, value] : recipe.settings)
+        config.set_deserialize_strict(key, value);
 
-    TriangleMesh cube = mesh(TestMesh::cube_20x20x20);
-    cube.scale(Vec3f(1.f, 1.f, recipe.height / 20.f));
-    cube.translate(115.f, 115.f, 0.f);
     std::vector<TriangleMesh> meshes;
-    meshes.emplace_back(std::move(cube));
-    if (recipe.support_filament > 0) {
+    if (!recipe.meshes.empty()) {
+        // Side by side along X, centered on the bed.
+        float x = 135.5f - 0.5f * std::accumulate(recipe.meshes.begin(), recipe.meshes.end(), 0.f, [&recipe](float w, const TriangleMesh &m) {
+                      return w + float(m.bounding_box().size().x()) + recipe.gap;
+                  });
+        for (TriangleMesh m : recipe.meshes) {
+            const BoundingBoxf3 box = m.bounding_box();
+            m.translate(float(x - box.min.x()), float(136. - box.center().y()), float(-box.min.z()));
+            x += float(box.size().x()) + recipe.gap;
+            meshes.emplace_back(std::move(m));
+        }
+    } else {
+        TriangleMesh cube = mesh(TestMesh::cube_20x20x20);
+        cube.scale(Vec3f(1.f, 1.f, recipe.height / 20.f));
+        cube.translate(115.f, 115.f, 0.f);
+        meshes.emplace_back(std::move(cube));
+    }
+    if (recipe.support_filament > 0 && recipe.meshes.empty()) {
         // A shelf sticking out of the cube 5 mm above the bed, for the supports to hold up.
         TriangleMesh shelf = mesh(TestMesh::cube_20x20x20);
         shelf.scale(Vec3f(0.5f, 1.f, 0.05f));
         shelf.translate(135.f, 115.f, 5.f);
         meshes.front().merge(shelf);
     }
-    const std::vector<std::vector<ConfigBase::SetDeserializeItem>> overrides = {{{"extruder", std::to_string(recipe.object_filament)}}};
+    std::vector<std::vector<ConfigBase::SetDeserializeItem>> overrides;
+    for (size_t i = 0; i < meshes.size(); ++i)
+        overrides.push_back({{"extruder", std::to_string(i < recipe.object_filaments.size() ? recipe.object_filaments[i] : recipe.object_filament)}});
     init_print(std::move(meshes), slice->print, slice->model, config, &overrides, /*arrange=*/false);
     // The first apply counts the filaments in use before the regions hold the feature filaments, which
     // turns a prime tower off; the app applies again on the next change or when slicing starts.
@@ -3357,4 +3379,169 @@ TEST_CASE("U1: supports count on the tool head of their filament", "[MultiNozzle
     CHECK(summary_features(*slice, 1).count("Supports") == 1);
     CHECK(summary_features(*slice, 0).count("Supports") == 0);
     CHECK(slice->gcode.find(";TYPE:Support") != std::string::npos);
+}
+
+// --- The recipes on real models ---------------------------------------------------------------------
+// Hidden, as it slices for several minutes: run it with "[U1Stress]". Every recipe of the setup dialog,
+// with supports, a prime tower and a Default nozzle too, on the models shipped in resources/handy_models
+// and tests/data. The printed G-code is checked against the sidebar summary: no tool head prints a layer
+// thicker than its nozzle or than the summary says, and every feature a tool head prints is in its summary.
+namespace {
+
+struct StressRecipe
+{
+    const char *name;
+    U1Recipe    recipe;
+};
+
+std::vector<StressRecipe> stress_recipes()
+{
+    std::vector<StressRecipe> out;
+    out.push_back({"Fast infill", u1_dialog_recipe({{"sparse_infill_filament_id", 2}})});
+    out.push_back({"Fine outside, fast inside", u1_dialog_recipe({{"inner_wall_filament_id", 2}, {"internal_solid_filament_id", 2}, {"sparse_infill_filament_id", 2}})});
+    out.push_back({"Fine walls, fast infill", u1_dialog_recipe({{"internal_solid_filament_id", 2}, {"sparse_infill_filament_id", 2}})});
+    {
+        U1Recipe recipe;
+        recipe.nozzles   = {0.2, 0.4, 0.6, 0.8};
+        recipe.preferred = {0.12, 0.24, 0.36, 0.48};
+        recipe.features  = {{"outer_wall_filament_id", 1},     {"top_surface_filament_id", 1},   {"inner_wall_filament_id", 2},
+                            {"bottom_surface_filament_id", 2}, {"internal_solid_filament_id", 3}, {"sparse_infill_filament_id", 4}};
+        out.push_back({"Four nozzle sizes", recipe});
+    }
+    {
+        U1Recipe recipe         = u1_dialog_recipe({{"sparse_infill_filament_id", 2}});
+        recipe.support_filament = 3;
+        recipe.settings         = {{"support_type", "tree(auto)"}};
+        out.push_back({"Fast infill, tree supports on head 3", recipe});
+    }
+    {
+        U1Recipe recipe    = u1_dialog_recipe({{"sparse_infill_filament_id", 2}});
+        recipe.prime_tower = true;
+        out.push_back({"Fast infill, prime tower", recipe});
+    }
+    {
+        U1Recipe recipe  = u1_dialog_recipe({{"inner_wall_filament_id", 2}, {"internal_solid_filament_id", 2}, {"sparse_infill_filament_id", 2}});
+        recipe.preferred = {0., 0.36, 0., 0.};
+        out.push_back({"Fine outside, fine head left at Default", recipe});
+    }
+    {
+        U1Recipe recipe = u1_dialog_recipe({{"sparse_infill_filament_id", 2}});
+        recipe.settings = {{"wall_loops", "3"}, {"sparse_infill_pattern", "gyroid"}, {"sparse_infill_density", "20%"}};
+        out.push_back({"Fast infill, 3 walls, gyroid", recipe});
+    }
+    return out;
+}
+
+std::vector<TriangleMesh> stress_meshes(const std::string &path)
+{
+    Model model = Model::read_from_file(path);
+    std::vector<TriangleMesh> out;
+    for (ModelObject *object : model.objects)
+        if (!object->volumes.empty())
+            out.emplace_back(object->mesh());
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("U1 stress: the setup dialog's recipes on real models print what the summary says", "[.][U1Stress]")
+{
+    const std::string resources = std::string(PROFILES_DIR) + "/../";
+    const std::string data      = std::string(TEST_DATA_DIR) + "/";
+    const std::string file = GENERATE_COPY(as<std::string>{}, resources + "handy_models/3DBenchy.drc", resources + "handy_models/Stanford_Bunny.drc",
+                                           resources + "handy_models/calicat.drc", resources + "handy_models/Voron_Design_Cube_v7.drc",
+                                           resources + "handy_models/OrcaCube_v2.drc", resources + "handy_models/ksr_fdmtest_v4.drc",
+                                           resources + "handy_models/OrcaToleranceTest.drc", data + "frog_legs.obj", data + "extruder_idler.obj",
+                                           data + "A.obj", data + "bridge.obj", data + "overhang.obj", data + "sloping_hole.obj",
+                                           data + "cube_with_concave_hole.obj", data + "ipadstand.obj");
+    const std::vector<StressRecipe> recipes = stress_recipes();
+    const size_t                    index   = GENERATE_COPY(range(size_t(0), recipes.size()));
+    U1Recipe                        recipe  = recipes[index].recipe;
+    recipe.meshes                           = stress_meshes(file);
+    REQUIRE_FALSE(recipe.meshes.empty());
+    INFO(file << " with " << recipes[index].name);
+
+    const auto slice = slice_u1_recipe(recipe);
+    INFO(u1_digest(*slice));
+    REQUIRE_FALSE(slice->extrusions.empty());
+
+    // No tool head prints thicker than its nozzle.
+    for (const U1Extrusion &e : slice->extrusions)
+        if (e.tool >= 0 && size_t(e.tool) < recipe.nozzles.size() && e.height > recipe.nozzles[size_t(e.tool)] + EPSILON) {
+            FAIL_CHECK("T" << e.tool << " (" << recipe.nozzles[size_t(e.tool)] << " mm) prints " << e.feature << " " << e.height << " mm thick at Z " << e.z);
+            break;
+        }
+    for (size_t head = 0; head < slice->uses.heads.size(); ++head) {
+        // Every feature a tool head prints is in its summary.
+        for (const char *feature : {"Outer walls", "Inner walls", "Top surfaces", "Bottom surfaces", "Solid infill", "Sparse infill"}) {
+            if (u1_feature(*slice, int(head), u1_gcode_type(feature), true).layers.empty())
+                continue;
+            INFO("T" << head << " prints " << feature);
+            CHECK(summary_features(*slice, head).count(feature) == 1);
+        }
+        // Never thicker than the summary says.
+        for (const ToolHeadFeatureUse &use : slice->uses.heads[head].features) {
+            const char *type = u1_gcode_type(use.feature);
+            if (type == nullptr || use.feature == "Bottom surfaces")
+                continue;
+            INFO("T" << head << " " << use.feature << " at " << use.height);
+            CHECK(u1_feature(*slice, int(head), type).max_height() <= use.height + 1e-3);
+        }
+    }
+}
+
+TEST_CASE("U1 stress: plates with one color per object slice, with and without a prime tower", "[.][U1Stress]")
+{
+    const std::string resources = std::string(PROFILES_DIR) + "/../";
+    std::vector<TriangleMesh> meshes = stress_meshes(resources + "handy_models/3DBenchy.drc");
+    for (const char *file : {"handy_models/Stanford_Bunny.drc", "handy_models/calicat.drc", "handy_models/OrcaCube_v2.drc"})
+        meshes.push_back(stress_meshes(resources + file).front());
+    // The flush volumes the app computes for four filaments on four tool heads: one 4 x 4 block per head.
+    std::string flush;
+    for (size_t head = 0; head < 4; ++head)
+        for (size_t from = 0; from < 4; ++from)
+            for (size_t to = 0; to < 4; ++to)
+                flush += std::string(flush.empty() ? "" : ",") + (from == to ? "0" : "280");
+
+    // Printing one object at a time needs objects lower than the print head's clearance, set wide apart.
+    std::vector<TriangleMesh> low;
+    for (int i = 0; i < 2; ++i) {
+        low.push_back(mesh(TestMesh::cube_20x20x20));
+        low.back().scale(Vec3f(1.f, 1.f, 0.5f));
+    }
+
+    struct Plate { const char *name; std::vector<int> filaments; bool tower; int support; std::vector<std::pair<std::string, std::string>> settings; bool low; };
+    const std::vector<Plate> plates = {
+        {"four colors, prime tower", {1, 2, 3, 4}, true, 0, {}, false},
+        {"four colors, no prime tower", {1, 2, 3, 4}, false, 0, {}, false},
+        {"two colors, supports in a third", {1, 2, 1, 2}, true, 4, {{"support_type", "normal(auto)"}}, false},
+        {"two colors, one object at a time", {1, 2}, false, 0, {{"print_sequence", "by object"}}, true},
+    };
+    const Plate &plate = plates[GENERATE(range(size_t(0), size_t(4)))];
+    INFO(plate.name);
+
+    U1Recipe recipe;
+    recipe.nozzles          = {0.4, 0.4, 0.4, 0.4};
+    recipe.process          = "0.20mm Standard @Snapmaker U1 (0.4 nozzle)";
+    recipe.meshes           = plate.low ? low : meshes;
+    recipe.gap              = plate.low ? 160.f : 10.f;
+    recipe.object_filaments = plate.filaments;
+    recipe.prime_tower      = plate.tower;
+    recipe.support_filament = plate.support;
+    recipe.settings         = plate.settings;
+    recipe.settings.push_back({"flush_volumes_matrix", flush});
+    const auto slice = slice_u1_recipe(recipe);
+    INFO(u1_digest(*slice));
+
+    // Each object prints with the tool head of its filament.
+    std::set<int> tools;
+    for (const U1Extrusion &e : slice->extrusions)
+        tools.insert(e.tool);
+    std::set<int> expected;
+    for (int f : plate.filaments)
+        expected.insert(f - 1);
+    if (plate.support > 0)
+        expected.insert(plate.support - 1);
+    CHECK(tools == expected);
+    CHECK(slice->print.has_wipe_tower() == plate.tower);
 }

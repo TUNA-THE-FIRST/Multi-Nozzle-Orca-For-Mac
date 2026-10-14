@@ -10648,10 +10648,12 @@ void DynamicPrintConfig::normalize_fdm(int used_filaments)
         }
     }
 
-    if (this->has("wipe_tower_filament")) {
+    // A process preset loaded on its own (the command line normalizes each settings file it loads) has
+    // no nozzle_diameter to check the filament against.
+    if (const auto *nozzles = this->opt<ConfigOptionFloats>("nozzle_diameter"); this->has("wipe_tower_filament") && nozzles != nullptr) {
         // If invalid, replace with 0.
         int extruder      = this->opt<ConfigOptionInt>("wipe_tower_filament")->value;
-        int num_extruders = this->opt<ConfigOptionFloats>("nozzle_diameter")->size();
+        int num_extruders = nozzles->size();
         if (extruder < 0 || extruder > num_extruders)
             this->option("wipe_tower_filament")->setInt(0);
     }
