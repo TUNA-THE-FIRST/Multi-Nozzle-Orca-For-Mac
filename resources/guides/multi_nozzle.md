@@ -51,7 +51,10 @@ Printing...**), then:
 4. Click **Apply**, then slice.
 
 The recipes treat the first nozzle as the fine one and the largest other nozzle as the coarse one, and give **both**
-a layer height of their own (see *Not set* below for why that matters).
+a layer height of their own (see *Not set* below for why that matters): the fine nozzle the object layer height, the
+coarse nozzle the thickest whole multiple of it that the nozzle prints well (at most about 3/4 of the nozzle and its
+preset's maximum layer height). With 0.12 mm object layers a 0.8 mm nozzle gets 0.48 mm, every 4th layer; choose
+0.36 mm in its layer height list for a gentler start. Recipes leave the supports as they are set.
 
 ## Setting it up by hand
 

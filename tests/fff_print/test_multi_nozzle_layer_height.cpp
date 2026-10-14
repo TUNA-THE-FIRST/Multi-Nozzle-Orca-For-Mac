@@ -20,6 +20,7 @@
 #include "libslic3r/Flow.hpp"
 #include "libslic3r/Slicing.hpp"
 #include "libslic3r/GCode/ToolOrdering.hpp"
+#include "libslic3r/MixedFilament.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/TriangleSelector.hpp"
 #include "libslic3r/ClipperUtils.hpp"
@@ -3206,9 +3207,10 @@ double summary_height(const U1Slice &slice, size_t head, const std::string &feat
     return 0.;
 }
 
-// The recipes of the "Set up multi-nozzle printing" dialog (MultiNozzle.cpp) on a U1 with a 0.4 mm
-// nozzle on tool head 1 and a 0.8 mm nozzle on tool head 2, 0.12 mm object layers: the fine head
-// prints 0.12 mm layers and the coarse head 0.36 mm, both explicit.
+// The feature assignments of the "Set up multi-nozzle printing" dialog's recipes (MultiNozzle.cpp) on a
+// U1 with a 0.4 mm nozzle on tool head 1 and a 0.8 mm nozzle on tool head 2, 0.12 mm object layers: the
+// fine head prints 0.12 mm layers and the coarse head 0.36 mm, both explicit. The dialog itself gives
+// the coarse head the thickest multiple its nozzle prints well, 0.48 mm here; tested on its own below.
 U1Recipe u1_dialog_recipe(std::vector<std::pair<std::string, int>> features)
 {
     U1Recipe recipe;
@@ -3219,7 +3221,7 @@ U1Recipe u1_dialog_recipe(std::vector<std::pair<std::string, int>> features)
 
 } // namespace
 
-TEST_CASE("U1 recipe Fast infill: the coarse nozzle prints the sparse infill every third layer", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
+TEST_CASE("On a U1 the Fast infill recipe prints the sparse infill with the coarse nozzle every third layer", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
 {
     const auto slice = slice_u1_recipe(u1_dialog_recipe({{"sparse_infill_filament_id", 2}}));
     INFO(u1_digest(*slice));
@@ -3265,7 +3267,7 @@ TEST_CASE("U1 recipe Fast infill: the coarse nozzle prints the sparse infill eve
     }
 }
 
-TEST_CASE("U1 recipe Fine outside, fast inside: outer walls and surfaces fine, inner walls and infill coarse", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
+TEST_CASE("On a U1 the Fine outside, fast inside recipe prints outer walls and surfaces fine, inner walls and infill coarse", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
 {
     const auto slice = slice_u1_recipe(u1_dialog_recipe({{"inner_wall_filament_id", 2},
                                                          {"internal_solid_filament_id", 2},
@@ -3289,7 +3291,7 @@ TEST_CASE("U1 recipe Fine outside, fast inside: outer walls and surfaces fine, i
     CHECK(summary_height(*slice, 1, "Inner walls") == Catch::Approx(0.36));
 }
 
-TEST_CASE("U1 recipe Fine walls, fast infill: every wall fine, solid and sparse infill coarse", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
+TEST_CASE("On a U1 the Fine walls, fast infill recipe prints every wall fine, solid and sparse infill coarse", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
 {
     const auto slice = slice_u1_recipe(u1_dialog_recipe({{"internal_solid_filament_id", 2}, {"sparse_infill_filament_id", 2}}));
     INFO(u1_digest(*slice));
@@ -3302,7 +3304,7 @@ TEST_CASE("U1 recipe Fine walls, fast infill: every wall fine, solid and sparse 
     check_summary_matches_gcode(*slice);
 }
 
-TEST_CASE("U1: a nozzle left at Default follows the coarse nozzle in the parts it shares, and the summary says so", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
+TEST_CASE("On a U1 a nozzle left at Default follows the coarse nozzle in the parts it shares, and the summary says so", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
 {
     // The fine head without a preferred layer height: the part's walls take their pitch from the
     // coarse inner wall filament, so the fine head's outer walls print 0.36 mm layers too. The setup
@@ -3317,7 +3319,7 @@ TEST_CASE("U1: a nozzle left at Default follows the coarse nozzle in the parts i
     CHECK(summary_height(*slice, 0, "Outer walls") == Catch::Approx(0.36));
 }
 
-TEST_CASE("U1 recipe Fast infill with the prime tower on keeps the coarse infill", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
+TEST_CASE("On a U1 the Fast infill recipe keeps the coarse infill with the prime tower on", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
 {
     U1Recipe recipe    = u1_dialog_recipe({{"sparse_infill_filament_id", 2}});
     recipe.prime_tower = true;
@@ -3331,7 +3333,7 @@ TEST_CASE("U1 recipe Fast infill with the prime tower on keeps the coarse infill
     check_summary_matches_gcode(*slice);
 }
 
-TEST_CASE("U1: preferred heights that are no multiples of each other print with the walls' height, and the summary says so", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
+TEST_CASE("On a U1 preferred heights that are no multiples of each other print with the walls' height, and the summary says so", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
 {
     // 0.2 mm on the 0.4 nozzle and 0.3 mm on the 0.8 nozzle: the object layer height becomes 0.1 mm,
     // the walls print 0.2 mm layers, and the sparse infill cannot combine to 0.3 mm on top of them.
@@ -3352,7 +3354,7 @@ TEST_CASE("U1: preferred heights that are no multiples of each other print with 
                       [](const std::string &w) { return w.find("cannot all be honored") != std::string::npos; }));
 }
 
-TEST_CASE("U1: an object on another filament prints its Default features with that tool head", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
+TEST_CASE("On a U1 an object on another filament prints its Default features with that tool head", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
 {
     // The object on filament 3: the features left at Default print with tool head 3 (T2), the sparse
     // infill with the coarse tool head 2.
@@ -3369,7 +3371,56 @@ TEST_CASE("U1: an object on another filament prints its Default features with th
     check_summary_matches_gcode(*slice);
 }
 
-TEST_CASE("U1: supports count on the tool head of their filament", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
+TEST_CASE("On a U1 the coarse height the setup dialog chooses prints the sparse infill every fourth layer", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
+{
+    // The dialog gives the 0.8 mm nozzle the thickest multiple of 0.12 mm it prints well: 0.48 mm, within
+    // the 0.8 mm size preset's 0.56 mm maximum and 3/4 of the nozzle.
+    U1Recipe recipe  = u1_dialog_recipe({{"sparse_infill_filament_id", 2}});
+    recipe.preferred = {0.12, 0.48, 0., 0.};
+    recipe.height    = 12.f;
+    const auto slice = slice_u1_recipe(recipe);
+    INFO(u1_digest(*slice));
+
+    CHECK(slice->grid == Catch::Approx(0.12));
+    CHECK(u1_feature(*slice, 0, "Outer wall").height_set() == std::set<double>{0.12});
+    CHECK(u1_feature(*slice, 1, "Sparse infill").main_height() == Catch::Approx(0.48));
+    check_summary_matches_gcode(*slice);
+    CHECK(summary_height(*slice, 1, "Sparse infill") == Catch::Approx(0.48));
+}
+
+TEST_CASE("On a U1 an object on a mixed filament counts for the tool heads of both its filaments", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
+{
+    // A mixed filament of filaments 1 and 2, defined in the project: filament 5, after the four physical ones.
+    MixedFilamentManager definition;
+    definition.add_custom_filament(1, 2, 50, {"#FF0000", "#00FF00", "#0000FF", "#FFFF00"});
+    definition.mixed_filaments().front().distribution_mode = int(MixedFilament::Simple);
+    U1Recipe recipe;
+    recipe.nozzles         = {0.4, 0.4, 0.4, 0.4};
+    recipe.object_filament = 5;
+    recipe.settings        = {{"mixed_filament_definitions", definition.serialize_custom_entries()}};
+    const auto slice = slice_u1_recipe(recipe);
+    INFO(u1_digest(*slice));
+
+    const MixedFilamentManager &mixed = slice->print.mixed_filament_manager();
+    REQUIRE(mixed.is_mixed(5, 4));
+    std::vector<int> components{5};
+    mixed.expand_virtual_extruder_ids(components, 4);
+    std::set<int> heads;
+    for (int id : components)
+        heads.insert(id - 1);
+    REQUIRE(heads.size() == 2);
+
+    std::set<int> printed;
+    for (const U1Extrusion &e : slice->extrusions)
+        printed.insert(e.tool);
+    CHECK(printed == heads);
+    for (int head : heads) {
+        INFO("T" << head);
+        CHECK(summary_features(*slice, size_t(head)).count("Outer walls") == 1);
+    }
+}
+
+TEST_CASE("On a U1 supports count on the tool head of their filament", "[MultiNozzleLayerHeight][Profiles][U1Recipe]")
 {
     U1Recipe recipe         = u1_dialog_recipe({{"sparse_infill_filament_id", 2}});
     recipe.support_filament = 2;
@@ -3429,6 +3480,11 @@ std::vector<StressRecipe> stress_recipes()
         recipe.settings = {{"wall_loops", "3"}, {"sparse_infill_pattern", "gyroid"}, {"sparse_infill_density", "20%"}};
         out.push_back({"Fast infill, 3 walls, gyroid", recipe});
     }
+    {
+        U1Recipe recipe  = u1_dialog_recipe({{"inner_wall_filament_id", 2}, {"internal_solid_filament_id", 2}, {"sparse_infill_filament_id", 2}});
+        recipe.preferred = {0.12, 0.48, 0., 0.};
+        out.push_back({"Fine outside, fast inside, as the dialog sets it (0.48 mm)", recipe});
+    }
     return out;
 }
 
@@ -3444,7 +3500,7 @@ std::vector<TriangleMesh> stress_meshes(const std::string &path)
 
 } // namespace
 
-TEST_CASE("U1 stress: the setup dialog's recipes on real models print what the summary says", "[.][U1Stress]")
+TEST_CASE("The setup dialog's recipes on real models print what the summary says", "[.][U1Stress]")
 {
     const std::string resources = std::string(PROFILES_DIR) + "/../";
     const std::string data      = std::string(TEST_DATA_DIR) + "/";
@@ -3490,7 +3546,7 @@ TEST_CASE("U1 stress: the setup dialog's recipes on real models print what the s
     }
 }
 
-TEST_CASE("U1 stress: plates with one color per object slice, with and without a prime tower", "[.][U1Stress]")
+TEST_CASE("Plates with one color per object slice with and without a prime tower", "[.][U1Stress]")
 {
     const std::string resources = std::string(PROFILES_DIR) + "/../";
     std::vector<TriangleMesh> meshes = stress_meshes(resources + "handy_models/3DBenchy.drc");

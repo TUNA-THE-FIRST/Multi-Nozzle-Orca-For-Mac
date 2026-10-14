@@ -21,6 +21,9 @@ struct ToolHeadFeatureUse
     std::string  feature;     // untranslated, see tool_head_features(); "Supports" for support material
     double       height = 0.; // the layer height it prints with, mm; 0 for supports (they follow the support layers)
     unsigned int every  = 1;  // prints on every `every`-th object layer
+    // Sparse infill combined up to Infill combination's maximum layer height (the engine's own rule,
+    // capped by the nozzles), not to a preferred layer height.
+    bool         combined = false;
 };
 
 struct ToolHeadUse
@@ -28,7 +31,8 @@ struct ToolHeadUse
     double nozzle    = 0.; // nozzle diameter, mm
     double preferred = 0.; // the preferred layer height planned for the tool head, mm; 0 = Default
     // In the order of tool_head_features(), then supports; a feature printed at several heights (by
-    // several objects or parts) is listed once per height. Empty: the tool head prints nothing.
+    // several objects or parts) is listed once per height and object layer height. Empty: the tool
+    // head prints nothing.
     std::vector<ToolHeadFeatureUse> features;
 };
 
@@ -46,7 +50,8 @@ ToolHeadUses tool_head_uses(const Print &print, const std::vector<double> &head_
 // layer heights are planned here (as PresetBundle::full_config_for_print() plans them).
 ToolHeadUses tool_head_uses(const Model &model, DynamicPrintConfig config);
 
-// The tool head (0-based) that prints filament `filament` (1-based): the tool of the same number.
+// The tool head (0-based) that prints filament `filament` (1-based): the tool of the same number; the
+// first tool head for a filament beyond them, as the engine reads per-tool settings for it.
 size_t tool_head_of_filament(const DynamicPrintConfig &config, int filament);
 
 // The feature filament keys of the features tool_head_uses() reports, with their untranslated

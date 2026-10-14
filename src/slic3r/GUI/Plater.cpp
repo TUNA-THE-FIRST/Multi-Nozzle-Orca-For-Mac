@@ -1949,6 +1949,8 @@ struct Sidebar::priv
     // Snapmaker Orca Mac: "What each nozzle prints" under the nozzle tabs (update_multi_nozzle_summary).
     StaticBox*                   m_nozzle_summary{nullptr};
     bool                         m_nozzle_summary_scheduled{false};
+    // The lines it shows (style, text): rebuilt only when they change.
+    std::vector<std::pair<int, wxString>> m_nozzle_summary_lines;
     // Sizes the nozzle block for its strip and its tallest page.
     void                         fit_nozzle_block();
 
@@ -6067,6 +6069,9 @@ void Sidebar::change_top_border_for_mode_sizer(bool increase_border)
 void Sidebar::msw_rescale()
 {
     SetMinSize(wxSize(42 * wxGetApp().em_unit(), -1));
+    // The multi-nozzle summary's labels are sized for the old scale: rebuild them.
+    p->m_nozzle_summary_lines.clear();
+    update_multi_nozzle_summary();
     p->m_panel_printer_title->GetSizer()->SetMinSize(-1, 3 * wxGetApp().em_unit());
     p->m_panel_filament_title->GetSizer()
         ->SetMinSize(-1, 3 * wxGetApp().em_unit());
@@ -6150,6 +6155,9 @@ void Sidebar::msw_rescale()
 void Sidebar::sys_color_changed()
 {
     wxWindowUpdateLocker noUpdates(this);
+    // The multi-nozzle summary's labels carry the old colors: rebuild them.
+    p->m_nozzle_summary_lines.clear();
+    update_multi_nozzle_summary();
 
 #if 0
     for (wxWindow* win : std::vector<wxWindow*>{ this, p->sliced_info->GetStaticBox(), p->object_info->GetStaticBox(), p->btn_reslice, p->btn_export_gcode })
@@ -11647,12 +11655,40 @@ void Sidebar::update_multi_nozzle_summary()
         // What the engine will print, read from the plate's print as the last apply left it.
         const ToolHeadUses uses       = plate_tool_head_uses();
         const auto        *min_option = wxGetApp().preset_bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("min_layer_height");
+        const bool         shown      = uses.heads.size() > 1;
+        if (!shown && !box->IsShown())
+            return; // a single nozzle printer: nothing to show or lay out
+
+        // The lines first: most applies (moving an object, editing a setting) change none of them, and
+        // rebuilding the labels lays out the whole sidebar.
+        enum Style { Title, Head, HeadUnused, Detail, Warning };
+        std::vector<std::pair<int, wxString>> lines;
+        if (shown) {
+            const wxString dot = wxString::FromUTF8(u8" \u00B7 ");
+            lines.emplace_back(Title, _L("What each nozzle prints on this plate"));
+            for (size_t i = 0; i < uses.heads.size(); ++i) {
+                const ToolHeadUse &use  = uses.heads[i];
+                const wxString     name = nozzle_display_name(i, uses.heads.size());
+                const wxString     size = format_wxstr(_L("%1% mm"), mm_number(use.nozzle));
+                if (use.features.empty()) {
+                    lines.emplace_back(HeadUnused, name + dot + size + dot + _L("not used on this plate"));
+                    continue;
+                }
+                lines.emplace_back(Head, name + dot + size);
+                for (const wxString &line : tool_head_print_lines(use, uses.grid))
+                    lines.emplace_back(Detail, line);
+            }
+            for (const wxString &text : tool_head_warnings(uses, min_option != nullptr ? min_option->values : std::vector<double>{}))
+                lines.emplace_back(Warning, text);
+        }
+        if (lines == p->m_nozzle_summary_lines && box->IsShown() == shown)
+            return;
+        p->m_nozzle_summary_lines = lines;
 
         wxWindowUpdateLocker no_updates(box);
         box->DestroyChildren();
         wxSizer *sizer = box->GetSizer();
         sizer->Clear(false);
-        const bool shown = uses.heads.size() > 1;
         if (shown) {
             auto add_text = [box, sizer](const wxString &text, const wxFont &font, const wxColour &colour, int top) {
                 auto *label = new ogStaticText(box, text, wxST_NO_AUTORESIZE);
@@ -11667,22 +11703,14 @@ void Sidebar::update_multi_nozzle_summary()
             const wxColour text_colour = StateColor::darkModeColorFor(wxColour("#262E30"));
             const wxColour grey        = StateColor::darkModeColorFor(wxColour("#6B6B6B"));
             const wxColour warning     = wxColour("#FF6F00");
-            const wxString dot         = wxString::FromUTF8(u8" \u00B7 ");
-            add_text(_L("What each nozzle prints on this plate"), Label::Head_13, text_colour, 8);
-            for (size_t i = 0; i < uses.heads.size(); ++i) {
-                const ToolHeadUse &use  = uses.heads[i];
-                const wxString     name = nozzle_display_name(i, uses.heads.size());
-                const wxString     size = format_wxstr(_L("%1% mm"), mm_number(use.nozzle));
-                if (use.features.empty()) {
-                    add_text(name + dot + size + dot + _L("not used on this plate"), Label::Body_13, grey, 6);
-                    continue;
+            for (const auto &[style, text] : lines)
+                switch (style) {
+                case Title: add_text(text, Label::Head_13, text_colour, 8); break;
+                case Head: add_text(text, Label::Body_13, text_colour, 6); break;
+                case HeadUnused: add_text(text, Label::Body_13, grey, 6); break;
+                case Detail: add_text(text, Label::Body_12, grey, 2); break;
+                default: add_text(text, Label::Body_12, warning, 6); break;
                 }
-                add_text(name + dot + size, Label::Body_13, text_colour, 6);
-                for (const wxString &line : tool_head_print_lines(use, uses.grid))
-                    add_text(line, Label::Body_12, grey, 2);
-            }
-            for (const wxString &text : tool_head_warnings(uses, min_option != nullptr ? min_option->values : std::vector<double>{}))
-                add_text(text, Label::Body_12, warning, 6);
             auto *setup = new wxStaticText(box, wxID_ANY, _L("Set up multi-nozzle printing") + dots);
             setup->SetFont(Label::Body_13);
             setup->SetForegroundColour(wxColour("#009688"));

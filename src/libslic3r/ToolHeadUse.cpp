@@ -1,5 +1,6 @@
 #include "ToolHeadUse.hpp"
 
+#include "MixedFilament.hpp"
 #include "Model.hpp"
 #include "Print.hpp"
 #include "PrintConfig.hpp"
@@ -33,9 +34,10 @@ size_t tool_head_of_filament(const DynamicPrintConfig &config, int filament)
     const auto  *nozzles = config.option<ConfigOptionFloats>("nozzle_diameter");
     const size_t heads   = nozzles != nullptr && !nozzles->values.empty() ? nozzles->values.size() : 1;
     // The engine prints filament N with tool N (Print::extruder_index_of(), the T<N> of the G-code):
-    // on a tool changer like the U1 filament N is loaded on tool head N. Filaments beyond the tool
-    // heads wrap around, as there is no head of their own.
-    return size_t(std::max(1, filament) - 1) % heads;
+    // on a tool changer like the U1 filament N is loaded on tool head N. A filament beyond the tool
+    // heads has no head of its own; the per-tool settings fall back to the first (get_at()).
+    const size_t index = size_t(std::max(1, filament) - 1);
+    return index < heads ? index : 0;
 }
 
 ToolHeadUses tool_head_uses(const Print &print, const std::vector<double> &head_nozzles)
@@ -46,11 +48,12 @@ ToolHeadUses tool_head_uses(const Print &print, const std::vector<double> &head_
     for (size_t head = 0; head < heads; ++head)
         out.heads[head].nozzle = head < head_nozzles.size() ? head_nozzles[head] : 0.;
 
-    const PrintConfig &config    = print.config();
-    const size_t       filaments = config.filament_diameter.values.size();
-    // The tool head printing a 0-based filament: the tool of the same number (Print::extruder_index_of(),
-    // the T<N> of the G-code). `heads` for a filament without a tool head of its own, and for a
-    // Snapmaker mixed filament, a virtual id that prints with a different tool head on every layer.
+    const PrintConfig          &config    = print.config();
+    const size_t                filaments = config.filament_diameter.values.size();
+    const MixedFilamentManager &mixed     = print.mixed_filament_manager();
+    // The tool head printing a 0-based physical filament: the tool of the same number
+    // (Print::extruder_index_of(), the T<N> of the G-code); `heads` for one without a tool head of its
+    // own. add() resolves a Snapmaker mixed filament to its physical components first.
     auto head_of = [filaments, heads](unsigned int filament) -> size_t {
         return filament < filaments && filament < heads ? size_t(filament) : heads;
     };
@@ -66,16 +69,25 @@ ToolHeadUses tool_head_uses(const Print &print, const std::vector<double> &head_
             if (const size_t head = head_of(filament); head < heads && out.heads[head].preferred <= 0.)
                 out.heads[head].preferred = object->extruder_preferred_layer_height(filament + 1);
 
-        auto add = [&](int filament_id, const char *feature, double height) {
-            const size_t head = head_of(feature_filament_idx(filament_id));
-            if (head >= heads)
-                return;
-            std::vector<ToolHeadFeatureUse> &features = out.heads[head].features;
-            const bool known = std::any_of(features.begin(), features.end(), [feature, height](const ToolHeadFeatureUse &use) {
-                return use.feature == feature && std::abs(use.height - height) < EPSILON;
-            });
-            if (!known)
-                features.push_back({feature, height, height > EPSILON ? (unsigned int)std::max(1L, std::lround(height / h)) : 1u});
+        auto add = [&](int filament_id, const char *feature, double height, bool combined = false) {
+            const unsigned int filament = feature_filament_idx(filament_id);
+            // A Snapmaker mixed filament prints with its physical components, alternating by layer: the
+            // feature counts for the tool head of each.
+            std::vector<int> physical{int(filament) + 1};
+            if (filament >= filaments && mixed.is_mixed(filament + 1, filaments))
+                mixed.expand_virtual_extruder_ids(physical, filaments);
+            const unsigned int every = height > EPSILON ? (unsigned int)std::max(1L, std::lround(height / h)) : 1u;
+            for (int id : physical) {
+                const size_t head = id >= 1 ? head_of(unsigned(id - 1)) : heads;
+                if (head >= heads)
+                    continue;
+                std::vector<ToolHeadFeatureUse> &features = out.heads[head].features;
+                const bool known = std::any_of(features.begin(), features.end(), [feature, height, every, combined](const ToolHeadFeatureUse &use) {
+                    return use.feature == feature && std::abs(use.height - height) < EPSILON && use.every == every && use.combined == combined;
+                });
+                if (!known)
+                    features.push_back({feature, height, every, combined});
+            }
         };
 
         // Mirrors the heights Print::validate() derives for its per-extruder layer height checks: the
@@ -117,6 +129,7 @@ ToolHeadUses tool_head_uses(const Print &print, const std::vector<double> &head_
                 // At 100% density the interior is solid infill of the internal solid filament.
                 const int filament_id = std::max(1, solid_interior ? rc.internal_solid_filament_id.value : rc.sparse_infill_filament_id.value);
                 double    height      = region_pitch;
+                bool      combined    = false;
                 if (region_m == 1) {
                     const double preferred = object->extruder_preferred_layer_height((unsigned int)filament_id);
                     double       cap       = 0.;
@@ -129,11 +142,12 @@ ToolHeadUses tool_head_uses(const Print &print, const std::vector<double> &head_
                                               std::min(cap, config.nozzle_diameter.get_at(feature_filament_idx(id)));
                         if (const double limit = rc.infill_combination_max_layer_height.get_abs_value(cap); limit > 0.)
                             cap = std::min(cap, limit);
+                        combined = true;
                     }
                     if (cap > 0.)
                         height = std::max(1., std::floor(cap / h + EPSILON)) * h;
                 }
-                add(filament_id, solid_interior ? "Solid infill" : "Sparse infill", height);
+                add(filament_id, solid_interior ? "Solid infill" : "Sparse infill", height, combined && height > h + EPSILON);
             }
         }
 

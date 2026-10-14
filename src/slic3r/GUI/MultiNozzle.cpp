@@ -5,6 +5,7 @@
 #include "GUI_Utils.hpp"
 #include "I18N.hpp"
 #include "MainFrame.hpp"
+#include "MsgDialog.hpp"
 #include "OptionsGroup.hpp"
 #include "PartPlate.hpp"
 #include "Plater.hpp"
@@ -26,7 +27,10 @@
 
 #include "md4c/src/md4c-html.h"
 
+#include <wx/display.h>
 #include <wx/filename.h>
+#include <wx/scrolwin.h>
+#include <wx/settings.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/utils.h>
@@ -48,6 +52,17 @@ wxString mm_number(double value)
     return wxString(oss.str());
 }
 
+// A size or height as the presets write it ("0.4"), whatever the app's number locale (a decimal comma
+// in Portuguese or German would make std::atof() stop at the point).
+static double parse_mm(const std::string &text)
+{
+    std::istringstream iss(text);
+    iss.imbue(std::locale::classic());
+    double value = 0.;
+    iss >> value;
+    return iss.fail() ? 0. : value;
+}
+
 wxString nozzle_display_name(size_t head, size_t count)
 {
     if (count == 2)
@@ -55,45 +70,46 @@ wxString nozzle_display_name(size_t head, size_t count)
     return count <= 1 ? _L("Nozzle") : wxString(_L("Nozzle")) + wxString::Format(" %d", int(head + 1));
 }
 
-// "Outer walls, top surfaces": the features printed at `height`, translated.
-static wxString feature_list(const ToolHeadUse &use, double height)
+// "Outer walls, Top surfaces": the features printed at `height` (every `every` object layers when it
+// is not 0), translated. Not lowercased: that would break translations such as German nouns.
+static wxString feature_list(const ToolHeadUse &use, double height, unsigned int every = 0)
 {
     wxString list;
     for (const ToolHeadFeatureUse &feature : use.features) {
-        if (std::abs(feature.height - height) > EPSILON)
+        if (std::abs(feature.height - height) > EPSILON || (every != 0 && feature.every != every))
             continue;
-        wxString name = _(wxString::FromUTF8(feature.feature));
-        if (!list.empty()) {
-            list += ", ";
-            name.MakeLower();
-        }
-        list += name;
+        const wxString name = _(wxString::FromUTF8(feature.feature));
+        if (!list.Contains(name))
+            list += (list.empty() ? "" : ", ") + name;
     }
     return list;
 }
 
-static wxString layers_text(double height, double grid)
+static wxString layers_text(double height, unsigned int every)
 {
-    const long every = grid > EPSILON ? std::max(1L, std::lround(height / grid)) : 1;
     return every <= 1 ? format_wxstr(_L("%1% mm layers, every layer"), mm_number(height)) :
                         // TRN In the multi-nozzle texts: the nozzle prints only every Nth layer of the object.
                         format_wxstr(_L("%1% mm layers, every %2% layers"), mm_number(height), every);
 }
 
-std::vector<wxString> tool_head_print_lines(const ToolHeadUse &use, double grid)
+std::vector<wxString> tool_head_print_lines(const ToolHeadUse &use, double /*grid*/)
 {
-    std::vector<double> heights;
-    bool                supports = false;
+    // One line per layer height and object layer pitch: objects with layer heights of their own print
+    // the same height every other number of their layers.
+    std::vector<std::pair<double, unsigned int>> pitches;
+    bool                                         supports = false;
     for (const ToolHeadFeatureUse &feature : use.features) {
         if (feature.height <= EPSILON)
             supports = true;
-        else if (std::none_of(heights.begin(), heights.end(), [&feature](double h) { return std::abs(h - feature.height) < EPSILON; }))
-            heights.push_back(feature.height);
+        else if (std::none_of(pitches.begin(), pitches.end(), [&feature](const std::pair<double, unsigned int> &p) {
+                     return std::abs(p.first - feature.height) < EPSILON && p.second == feature.every;
+                 }))
+            pitches.emplace_back(feature.height, feature.every);
     }
-    std::sort(heights.begin(), heights.end());
+    std::sort(pitches.begin(), pitches.end());
     std::vector<wxString> lines;
-    for (double height : heights)
-        lines.push_back(layers_text(height, grid) + ": " + feature_list(use, height));
+    for (const auto &[height, every] : pitches)
+        lines.push_back(layers_text(height, every) + ": " + feature_list(use, height, every));
     if (supports)
         lines.push_back(_L("Supports"));
     return lines;
@@ -113,7 +129,7 @@ std::vector<wxString> tool_head_warnings(const ToolHeadUses &uses, const std::ve
                                                 name, mm_number(use.preferred)));
             continue;
         }
-        double thickest = 0., thinnest = 0.;
+        double thickest = 0., thinnest = 0., thickest_own = 0.;
         bool   prints_preferred = false;
         for (const ToolHeadFeatureUse &feature : use.features) {
             if (feature.height <= EPSILON)
@@ -121,14 +137,22 @@ std::vector<wxString> tool_head_warnings(const ToolHeadUses &uses, const std::ve
             thickest = std::max(thickest, feature.height);
             thinnest = thinnest <= 0. ? feature.height : std::min(thinnest, feature.height);
             prints_preferred |= std::abs(feature.height - use.preferred) < EPSILON;
+            // Infill combination's height is the engine's own rule, capped at the nozzles: no warning.
+            if (!feature.combined)
+                thickest_own = std::max(thickest_own, feature.height);
         }
         if (thickest <= 0.)
             continue; // supports only
-        if (use.nozzle > EPSILON && thickest > 0.75 * use.nozzle + 1e-6) {
+        if (use.nozzle > EPSILON && thickest_own > 0.75 * use.nozzle + 1e-6) {
             wxString text = format_wxstr(_L("%1% prints %2% in %3% mm layers, thicker than its %4% mm nozzle prints well (about "
                                             "3/4 of the nozzle at most): the lines may not stick to each other."),
-                                         name, feature_list(use, thickest).Lower(), mm_number(thickest), mm_number(use.nozzle));
-            if (use.preferred <= EPSILON)
+                                         name, feature_list(use, thickest_own), mm_number(thickest_own), mm_number(use.nozzle));
+            if (thickest_own <= uses.grid + EPSILON)
+                // The object layer height itself is too thick for this nozzle.
+                text += " " + format_wxstr(_L("The object layer height, %1% mm, is already that thick: choose a thinner layer "
+                                              "height in the process settings, or a larger nozzle."),
+                                           mm_number(uses.grid));
+            else if (use.preferred <= EPSILON)
                 text += " " + format_wxstr(_L("This happens because %1% has no layer height of its own: it then follows the "
                                               "coarser nozzle it shares these parts with. Give it its own layer height (the "
                                               "object layer height, %2% mm) in its nozzle tab or with \"Set up multi-nozzle printing\"."),
@@ -148,7 +172,7 @@ std::vector<wxString> tool_head_warnings(const ToolHeadUses &uses, const std::ve
             warnings.push_back(format_wxstr(_L("%1% prints %2% in %3% mm layers, below the %4% mm its nozzle prints reliably: "
                                                "the lines may come out uneven. Choose a coarser object layer height in the "
                                                "process settings, or let a finer nozzle print these features."),
-                                            name, feature_list(use, thinnest).Lower(), mm_number(thinnest), mm_number(min)));
+                                            name, feature_list(use, thinnest), mm_number(thinnest), mm_number(min)));
     }
     return warnings;
 }
@@ -257,9 +281,11 @@ private:
     DynamicPrintConfig         m_config;     // the plate's config as it is now, unplanned
     std::vector<std::string>   m_diameters;  // the nozzle sizes the printer has presets for
     std::vector<int>           m_head_filament;
+    size_t                     m_filaments = 1; // the filaments in the sidebar
     Model                      m_model;      // the objects on the plate, for the preview
     double                     m_base_height = 0.2;
 
+    wxScrolledWindow          *m_body = nullptr; // everything but the buttons, scrolled on a small screen
     ComboBox                  *m_recipe = nullptr;
     std::vector<ComboBox *>    m_size_fields;
     std::vector<ComboBox *>    m_height_fields;
@@ -269,6 +295,9 @@ private:
     ogStaticText              *m_result = nullptr;
 
     void     fill_height_field(size_t head);
+    wxString feature_choice_label(int filament, bool support) const;
+    int      feature_choice_index(int filament);
+    void     fit_to_screen();
     void     show_values();
     void     update_result();
     void     apply_recipe(int recipe);
@@ -292,9 +321,9 @@ MultiNozzleSetupDialog::MultiNozzleSetupDialog(wxWindow *parent)
     if (const auto *stored = bundle.printers.get_edited_preset().config.option<ConfigOptionFloats>("extruder_layer_height"); stored != nullptr)
         heights = stored->values;
     heights.resize(heads, 0.);
-    const size_t filaments = std::max<size_t>(1, bundle.filament_presets.size());
+    m_filaments = std::max<size_t>(1, bundle.filament_presets.size());
     for (size_t head = 0; head < heads; ++head)
-        m_head_filament.push_back(filament_of_head(m_config, head, filaments));
+        m_head_filament.push_back(filament_of_head(m_config, head, m_filaments));
     for (const ToolHeadFeature &feature : tool_head_features())
         features[feature.key] = m_config.has(feature.key) ? m_config.opt_int(feature.key) : 0;
     for (const char *key : SUPPORT_KEYS)
@@ -302,17 +331,21 @@ MultiNozzleSetupDialog::MultiNozzleSetupDialog(wxWindow *parent)
 
     SetBackgroundColour(*wxWHITE);
     SetFont(Label::Body_14);
+    m_body = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL);
+    m_body->SetBackgroundColour(*wxWHITE);
+    m_body->SetScrollRate(0, FromDIP(12));
+    wxWindow *body = m_body;
     auto *sizer = new wxBoxSizer(wxVERTICAL);
     const int pad = FromDIP(16);
-    auto add_text = [this, sizer, pad](const wxString &text, const wxFont &font, int top) {
-        auto *label = new wxStaticText(this, wxID_ANY, text);
+    auto add_text = [this, body, sizer, pad](const wxString &text, const wxFont &font, int top) {
+        auto *label = new wxStaticText(body, wxID_ANY, text);
         label->SetFont(font);
         label->Wrap(FromDIP(520));
         sizer->Add(label, 0, wxLEFT | wxRIGHT | wxTOP, top < 0 ? pad : FromDIP(top));
         return label;
     };
-    auto make_combo = [this](int width, bool editable) {
-        return new ComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, {FromDIP(width), -1}, 0, nullptr,
+    auto make_combo = [this, body](int width, bool editable) {
+        return new ComboBox(body, wxID_ANY, wxEmptyString, wxDefaultPosition, {FromDIP(width), -1}, 0, nullptr,
                             editable ? 0 : wxCB_READONLY);
     };
 
@@ -329,7 +362,7 @@ MultiNozzleSetupDialog::MultiNozzleSetupDialog(wxWindow *parent)
                                    _L("Fine outside, fast inside: outer walls and surfaces fine; inner walls and infill coarse"),
                                    _L("Fine walls, fast infill: all walls and surfaces fine; solid and sparse infill coarse"),
                                    _L("Fast sparse infill: only the sparse infill coarse (the safest start)"),
-                                   _L("Off: everything with the object's filament, no layer heights per nozzle")})
+                                   _L("Off: every feature with the object's filament, no layer heights per nozzle")})
         m_recipe->AppendString(recipe);
     m_recipe->SetSelection(0);
     m_recipe->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent &) {
@@ -346,11 +379,11 @@ MultiNozzleSetupDialog::MultiNozzleSetupDialog(wxWindow *parent)
     // Nozzles.
     add_text(_L("Nozzles"), Label::Head_14, 16);
     auto *grid = new wxFlexGridSizer(3, FromDIP(6), FromDIP(12));
-    grid->Add(new wxStaticText(this, wxID_ANY, wxEmptyString));
-    grid->Add(new wxStaticText(this, wxID_ANY, _L("Installed nozzle size")));
-    grid->Add(new wxStaticText(this, wxID_ANY, _L("Layer height it prints")));
+    grid->Add(new wxStaticText(body, wxID_ANY, wxEmptyString));
+    grid->Add(new wxStaticText(body, wxID_ANY, _L("Installed nozzle size")));
+    grid->Add(new wxStaticText(body, wxID_ANY, _L("Layer height it prints")));
     for (size_t head = 0; head < heads; ++head) {
-        grid->Add(new wxStaticText(this, wxID_ANY, nozzle_display_name(head, heads)), 0, wxALIGN_CENTER_VERTICAL);
+        grid->Add(new wxStaticText(body, wxID_ANY, nozzle_display_name(head, heads)), 0, wxALIGN_CENTER_VERTICAL);
         ComboBox *size = make_combo(140, false);
         for (const std::string &d : m_diameters)
             size->AppendString(from_u8(d) + " mm");
@@ -360,7 +393,7 @@ MultiNozzleSetupDialog::MultiNozzleSetupDialog(wxWindow *parent)
         size->Bind(wxEVT_COMBOBOX, [this, head, size](wxCommandEvent &) {
             const int sel = size->GetSelection();
             if (sel >= 0 && size_t(sel) < m_diameters.size())
-                nozzles[head] = std::atof(m_diameters[sel].c_str());
+                nozzles[head] = parse_mm(m_diameters[sel]);
             fill_height_field(head);
             update_result();
         });
@@ -395,16 +428,10 @@ MultiNozzleSetupDialog::MultiNozzleSetupDialog(wxWindow *parent)
         rows.emplace_back(feature.key, _(wxString::FromUTF8(feature.name)));
     rows.emplace_back("support", _L("Supports"));
     for (const auto &[key, label] : rows) {
-        features_grid->Add(new wxStaticText(this, wxID_ANY, label), 0, wxALIGN_CENTER_VERTICAL);
+        features_grid->Add(new wxStaticText(body, wxID_ANY, label), 0, wxALIGN_CENTER_VERTICAL);
         ComboBox *field = make_combo(260, false);
-        for (int filament : m_feature_choices) {
-            if (filament == 0) {
-                field->AppendString(_L("The object's own filament"));
-                continue;
-            }
-            const size_t head = tool_head_of_filament(m_config, filament);
-            field->AppendString(format_wxstr(_L("%1% (filament %2%)"), nozzle_display_name(head, heads), filament));
-        }
+        for (int filament : m_feature_choices)
+            field->AppendString(feature_choice_label(filament, key == "support"));
         field->Bind(wxEVT_COMBOBOX, [this, key = key, field](wxCommandEvent &) {
             const int sel = field->GetSelection();
             const int filament = sel >= 0 && size_t(sel) < m_feature_choices.size() ? m_feature_choices[sel] : 0;
@@ -420,29 +447,75 @@ MultiNozzleSetupDialog::MultiNozzleSetupDialog(wxWindow *parent)
     }
     sizer->Add(features_grid, 0, wxLEFT | wxRIGHT | wxTOP, FromDIP(6));
     add_text(_L("\"The object's own filament\" follows the filament each object or part is set to in the object list. Supports "
-                "are printed only where support is turned on."),
+                "are printed only where support is turned on; supports left at \"Any nozzle\" print with whichever nozzle "
+                "is already printing that layer. Recipes leave the supports as they are."),
              Label::Body_12, 4)->SetForegroundColour(StateColor::darkModeColorFor(wxColour("#6B6B6B")));
 
     // Result.
     add_text(_L("What will happen"), Label::Head_14, 16);
-    m_result = new ogStaticText(this, wxEmptyString, wxST_NO_AUTORESIZE);
+    m_result = new ogStaticText(body, wxEmptyString, wxST_NO_AUTORESIZE);
     m_result->SetFont(Label::Body_13);
     m_result->SetMinSize({FromDIP(520), -1});
     sizer->Add(m_result, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(6));
 
+    sizer->AddSpacer(FromDIP(4));
+    m_body->SetSizer(sizer);
+
+    // The buttons stay below the scrolled body, so they are on screen however long the result grows.
     auto *buttons = new DialogButtons(this, {"OK", "Cancel"});
     buttons->GetOK()->SetLabel(_L("Apply"));
     buttons->GetOK()->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { EndModal(wxID_OK); });
     buttons->GetCANCEL()->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { EndModal(wxID_CANCEL); });
-    sizer->Add(buttons, 0, wxEXPAND | wxTOP, FromDIP(12));
+    auto *outer = new wxBoxSizer(wxVERTICAL);
+    outer->Add(m_body, 1, wxEXPAND);
+    outer->Add(buttons, 0, wxEXPAND | wxTOP, FromDIP(8));
+    SetSizer(outer);
 
     for (size_t head = 0; head < heads; ++head)
         fill_height_field(head);
     show_values();
     update_result();
-    SetSizerAndFit(sizer);
     wxGetApp().UpdateDlgDarkUI(this);
     CenterOnParent();
+}
+
+// As tall as the content, at most three quarters of the screen: a 13-inch Mac shows the whole dialog
+// with its buttons, the body scrolls.
+void MultiNozzleSetupDialog::fit_to_screen()
+{
+    const int     display_index = wxDisplay::GetFromWindow(this);
+    const wxRect  area          = wxDisplay(display_index == wxNOT_FOUND ? 0u : unsigned(display_index)).GetClientArea();
+    const wxSize  content       = m_body->GetSizer()->CalcMin();
+    const int     scrollbar     = wxSystemSettings::GetMetric(wxSYS_VSCROLL_X, this);
+    m_body->SetMinSize({content.x + scrollbar, std::min(content.y, area.GetHeight() * 3 / 4)});
+    m_body->FitInside();
+    Layout();
+    Fit();
+}
+
+// The label of a filament in the feature lists: the nozzle that prints it.
+wxString MultiNozzleSetupDialog::feature_choice_label(int filament, bool support) const
+{
+    if (filament == 0)
+        // Supports at Default print with the filament active on the layer, not the object's.
+        return support ? _L("Any nozzle (the one already printing the layer)") : _L("The object's own filament");
+    if (size_t(filament) > m_filaments)
+        // TRN A filament number that is not one of the sidebar's filaments, for example a mixed filament.
+        return format_wxstr(_L("Filament %1%"), filament);
+    return format_wxstr(_L("%1% (filament %2%)"), nozzle_display_name(tool_head_of_filament(m_config, filament), nozzles.size()), filament);
+}
+
+// The item of a filament in the feature lists, added to every list when it is not there yet (a value
+// set in the process settings that no nozzle prints first), so the lists show the real setting.
+int MultiNozzleSetupDialog::feature_choice_index(int filament)
+{
+    const auto it = std::find(m_feature_choices.begin(), m_feature_choices.end(), filament);
+    if (it != m_feature_choices.end())
+        return int(it - m_feature_choices.begin());
+    m_feature_choices.push_back(filament);
+    for (const auto &[key, field] : m_feature_fields)
+        field->AppendString(feature_choice_label(filament, key == "support"));
+    return int(m_feature_choices.size() - 1);
 }
 
 // The heights offered for a tool head: the object layer height and its whole multiples the nozzle
@@ -478,7 +551,7 @@ void MultiNozzleSetupDialog::show_values()
 {
     for (size_t head = 0; head < m_size_fields.size(); ++head) {
         const auto it = std::find_if(m_diameters.begin(), m_diameters.end(),
-                                     [d = nozzles[head]](const std::string &s) { return std::abs(std::atof(s.c_str()) - d) < 1e-6; });
+                                     [d = nozzles[head]](const std::string &s) { return std::abs(parse_mm(s) - d) < 1e-6; });
         if (it != m_diameters.end())
             m_size_fields[head]->SetSelection(int(it - m_diameters.begin()));
         else
@@ -487,8 +560,7 @@ void MultiNozzleSetupDialog::show_values()
     }
     for (const auto &[key, field] : m_feature_fields) {
         const int filament = key == "support" ? features[SUPPORT_KEYS[0]] : features[key];
-        const auto it = std::find(m_feature_choices.begin(), m_feature_choices.end(), filament);
-        field->SetSelection(it == m_feature_choices.end() ? 0 : int(it - m_feature_choices.begin()));
+        field->SetSelection(feature_choice_index(filament));
     }
 }
 
@@ -532,7 +604,9 @@ void MultiNozzleSetupDialog::update_result()
         text = _L("Add an object to the plate to see what each nozzle will print.");
     } else {
         text = format_wxstr(_L("The objects are sliced in %1% mm layers."), mm_number(uses.grid));
-        if (std::abs(uses.grid - m_base_height) > 1e-6)
+        // The planned grid, not the first object's own layer height, which an object setting may change.
+        const double planned = effective_extruder_layer_heights(config).grid;
+        if (planned > EPSILON && planned < m_base_height - 1e-6)
             text += " " + format_wxstr(_L("That is finer than the %1% mm of the process preset, so that every nozzle's layer height is "
                                           "a whole multiple of it; slicing takes longer."),
                                        mm_number(m_base_height));
@@ -560,8 +634,7 @@ void MultiNozzleSetupDialog::update_result()
     }
     m_result->SetText(text, false);
     m_result->Wrap(FromDIP(520));
-    Layout();
-    Fit();
+    fit_to_screen();
 }
 
 // The thickest layer a tool head's nozzle prints well: the maximum layer height of the printer
@@ -606,10 +679,24 @@ void MultiNozzleSetupDialog::apply_recipe(int recipe)
             coarse = head;
     const int fine_filament   = m_head_filament.empty() ? 0 : m_head_filament[0];
     const int coarse_filament = coarse < heads ? m_head_filament[coarse] : 0;
+    if (recipe != 4 && (coarse_filament == 0 || fine_filament == 0)) {
+        // Nothing is changed: a recipe that cannot be set up must not reset what is set.
+        MessageDialog(this,
+                      heads <= 1 ? _L("The selected printer has one nozzle, so there is nothing to share between nozzles. Select a "
+                                      "printer preset with several tool heads, such as the Snapmaker U1, to print with several nozzles.") :
+                                   _L("This recipe needs a filament on the first nozzle and on a second one. Add filaments in the "
+                                      "sidebar's filament list until each nozzle you want to use has one (on the U1, filament 2 is "
+                                      "on nozzle 2), then choose the recipe again."),
+                      _L("Set up multi-nozzle printing"), wxOK | wxICON_INFORMATION)
+            .ShowModal();
+        return;
+    }
+    // Only what the recipes describe: the six features and the layer heights. Supports stay as set
+    // (a soluble support filament, for example).
     std::fill(heights.begin(), heights.end(), 0.);
-    for (auto &[key, filament] : features)
-        filament = 0;
-    if (recipe == 4 || coarse_filament == 0 || fine_filament == 0) {
+    for (const ToolHeadFeature &feature : tool_head_features())
+        features[feature.key] = 0;
+    if (recipe == 4) {
         show_values();
         update_result();
         return;
