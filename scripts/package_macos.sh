@@ -33,9 +33,11 @@ fi
 # codesign refuses files carrying Finder info or resource forks ("detritus not allowed").
 xattr -cr "$app"
 
-# Signing a Developer ID build needs a secure timestamp; an ad hoc signature must not ask for one.
+# Signing a Developer ID build needs a secure timestamp; an ad hoc signature must not ask for one. The
+# hardened runtime also checks every helper program the app starts on its own (the bundled python3
+# loading libraries from PyPI wheels), so each one gets the entitlements too.
 sign_args=(--force --sign "$identity")
-[ "$identity" != "-" ] && sign_args+=(--timestamp --options runtime)
+[ "$identity" != "-" ] && sign_args+=(--timestamp --options runtime --entitlements "$entitlements")
 
 machos=()
 while IFS= read -r f; do machos+=("$f"); done < <(
@@ -51,7 +53,11 @@ if [ "${#machos[@]}" -eq 0 ]; then
 fi
 echo "Signing ${#machos[@]} executables and libraries in $(basename "$app") (identity: $identity)..."
 codesign "${sign_args[@]}" "${machos[@]}"
-codesign "${sign_args[@]}" --entitlements "$entitlements" "$app"
+if [ "$identity" = "-" ]; then
+    codesign "${sign_args[@]}" --entitlements "$entitlements" "$app"
+else
+    codesign "${sign_args[@]}" "$app"
+fi
 codesign --verify --deep --strict --verbose=2 "$app"
 
 echo "Packing $(basename "$dmg")..."

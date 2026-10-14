@@ -318,39 +318,9 @@ function build_slicer() {
 
         verify_python_runtime "./${APP_BUNDLE}"
 
-        # Copy Sentry crashpad_handler and libsentry.dylib for crash reporting
-        CRASHPAD_HANDLER="${DEPS}/usr/local/bin/crashpad_handler"
-        LIBSENTRY="${DEPS}/usr/local/lib/libsentry.dylib"
+        # No Sentry crash reporter in the bundle: Snapmaker Orca Mac sends nothing to Snapmaker (see
+        # SLIC3R_SENTRY in CMakeLists.txt); macOS keeps its own crash reports.
         APP_MACOS_DIR="./${APP_BUNDLE}/Contents/MacOS"
-        APP_FRAMEWORKS_DIR="./${APP_BUNDLE}/Contents/Frameworks"
-        EXECUTABLE="${APP_MACOS_DIR}/Snapmaker_Orca"
-        
-        if [ -f "${CRASHPAD_HANDLER}" ]; then
-            echo "Copying crashpad_handler to app bundle..."
-            cp -f "${CRASHPAD_HANDLER}" "${APP_MACOS_DIR}/crashpad_handler"
-            # Sign crashpad_handler
-            codesign --force --sign - "${APP_MACOS_DIR}/crashpad_handler" 2>/dev/null || true
-        else
-            echo "Warning: crashpad_handler not found at ${CRASHPAD_HANDLER}"
-        fi
-        
-        if [ -f "${LIBSENTRY}" ]; then
-            echo "Copying libsentry.dylib to Frameworks..."
-            mkdir -p "${APP_FRAMEWORKS_DIR}"
-            cp -f "${LIBSENTRY}" "${APP_FRAMEWORKS_DIR}/libsentry.dylib"
-            # Sign libsentry.dylib
-            codesign --force --sign - "${APP_FRAMEWORKS_DIR}/libsentry.dylib" 2>/dev/null || true
-            
-            # Update rpath in Snapmaker_Orca to use @executable_path relative path
-            if [ -f "${EXECUTABLE}" ]; then
-                echo "Updating libsentry.dylib rpath in Snapmaker_Orca..."
-                install_name_tool -change "@rpath/libsentry.dylib" "@executable_path/../Frameworks/libsentry.dylib" "${EXECUTABLE}" 2>/dev/null || true
-                # Re-sign the executable after modification
-                codesign --force --sign - "${EXECUTABLE}" 2>/dev/null || true
-            fi
-        else
-            echo "Warning: libsentry.dylib not found at ${LIBSENTRY}"
-        fi
 
         # Copy Snapmaker_Orca_profile_validator.app if it exists
         if [ -f "../src$BUILD_DIR_CONFIG_SUBDIR/Snapmaker_Orca_profile_validator.app/Contents/MacOS/Snapmaker_Orca_profile_validator" ]; then
@@ -362,8 +332,7 @@ function build_slicer() {
             verify_python_runtime ./Snapmaker_Orca_profile_validator.app
         fi
 
-        # Generate dSYM debug symbols for debugging and Sentry crash reporting
-        # Always generate dSYM files - they are useful for crash analysis even without Sentry
+        # Generate dSYM debug symbols: they symbolicate the crash reports macOS keeps
         echo "Generating dSYM debug symbols..."
         DSYM_DIR="./dSYM"
         mkdir -p "${DSYM_DIR}"
@@ -372,18 +341,6 @@ function build_slicer() {
         if [ -f "${APP_MACOS_DIR}/Snapmaker_Orca" ]; then
             echo "Generating dSYM for Snapmaker_Orca..."
             dsymutil "${APP_MACOS_DIR}/Snapmaker_Orca" -o "${DSYM_DIR}/Snapmaker_Orca.dSYM" 2>/dev/null || echo "Warning: Failed to generate dSYM for Snapmaker_Orca (no debug symbols?)"
-        fi
-        
-        # Generate dSYM for crashpad_handler if it exists
-        if [ -f "${APP_MACOS_DIR}/crashpad_handler" ]; then
-            echo "Generating dSYM for crashpad_handler..."
-            dsymutil "${APP_MACOS_DIR}/crashpad_handler" -o "${DSYM_DIR}/crashpad_handler.dSYM" 2>/dev/null || true
-        fi
-        
-        # Generate dSYM for libsentry.dylib if it exists
-        if [ -f "${APP_FRAMEWORKS_DIR}/libsentry.dylib" ]; then
-            echo "Generating dSYM for libsentry.dylib..."
-            dsymutil "${APP_FRAMEWORKS_DIR}/libsentry.dylib" -o "${DSYM_DIR}/libsentry.dSYM" 2>/dev/null || true
         fi
         
         # Generate dSYM for profile_validator if it exists
@@ -453,17 +410,6 @@ function build_universal() {
     echo "Universal ${APP_BUNDLE} created at $UNIVERSAL_APP"
     verify_python_runtime "$UNIVERSAL_APP"
 
-    # Sentry: lipo invalidates the ad-hoc signatures and can drop the rewritten
-    # libsentry install name, so re-apply both on the universal bundle.
-    LIBSENTRY_UNIVERSAL="$UNIVERSAL_APP/Contents/Frameworks/libsentry.dylib"
-    if [ -f "${LIBSENTRY_UNIVERSAL}" ]; then
-        echo "Updating libsentry.dylib rpath in universal Snapmaker_Orca..."
-        install_name_tool -change "@rpath/libsentry.dylib" "@executable_path/../Frameworks/libsentry.dylib" "$UNIVERSAL_APP/$BINARY_PATH" 2>/dev/null || true
-        codesign --force --sign - "${LIBSENTRY_UNIVERSAL}" 2>/dev/null || true
-    fi
-    if [ -f "$UNIVERSAL_APP/Contents/MacOS/crashpad_handler" ]; then
-        codesign --force --sign - "$UNIVERSAL_APP/Contents/MacOS/crashpad_handler" 2>/dev/null || true
-    fi
     codesign --force --sign - "$UNIVERSAL_APP/$BINARY_PATH" 2>/dev/null || true
 
     # Create universal binary for profile validator if it exists
@@ -480,7 +426,7 @@ function build_universal() {
         codesign --force --sign - "$UNIVERSAL_VALIDATOR_APP/$VALIDATOR_BINARY_PATH" 2>/dev/null || true
     fi
     
-    # Generate dSYM for universal binary - always generate for debugging and Sentry crash reporting
+    # Generate dSYM for universal binary, for debugging crash reports
     echo "Generating dSYM for universal binary..."
     DSYM_DIR="$PROJECT_BUILD_DIR/Snapmaker_Orca/dSYM"
     mkdir -p "${DSYM_DIR}"
@@ -489,18 +435,6 @@ function build_universal() {
     if [ -f "$UNIVERSAL_APP/$BINARY_PATH" ]; then
         echo "Generating dSYM for universal Snapmaker_Orca..."
         dsymutil "$UNIVERSAL_APP/$BINARY_PATH" -o "${DSYM_DIR}/Snapmaker_Orca.dSYM" 2>/dev/null || echo "Warning: Failed to generate dSYM for universal Snapmaker_Orca"
-    fi
-    
-    # Generate dSYM for universal crashpad_handler if it exists
-    if [ -f "$UNIVERSAL_APP/Contents/MacOS/crashpad_handler" ]; then
-        echo "Generating dSYM for universal crashpad_handler..."
-        dsymutil "$UNIVERSAL_APP/Contents/MacOS/crashpad_handler" -o "${DSYM_DIR}/crashpad_handler.dSYM" 2>/dev/null || true
-    fi
-    
-    # Generate dSYM for universal libsentry.dylib if it exists
-    if [ -f "$UNIVERSAL_APP/Contents/Frameworks/libsentry.dylib" ]; then
-        echo "Generating dSYM for universal libsentry.dylib..."
-        dsymutil "$UNIVERSAL_APP/Contents/Frameworks/libsentry.dylib" -o "${DSYM_DIR}/libsentry.dSYM" 2>/dev/null || true
     fi
     
     # Generate dSYM for universal profile_validator if it exists

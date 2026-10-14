@@ -31,6 +31,10 @@ jobs:
   deps:
     name: Dependencies
     runs-on: macos-26
+    # actions: write lets "rebuild-deps" drop the cached build: a cache entry cannot be overwritten.
+    permissions:
+      contents: read
+      actions: write
     outputs:
       cache-key: ${{ steps.key.outputs.key }}
     steps:
@@ -44,6 +48,14 @@ jobs:
         run: |
           xcode=$(xcodebuild -version | head -1 | tr ' ' '-')
           echo "key=macos-arm64-${xcode}-deps-${{ hashFiles('deps/**') }}" >> "$GITHUB_OUTPUT"
+
+      # Saving under an existing key is refused, so a rebuild first drops the cached build; the build
+      # job then restores the new one under the same key.
+      - name: Drop the cached dependencies
+        if: ${{ inputs.rebuild-deps }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh cache delete "${{ steps.key.outputs.key }}" --repo "${{ github.repository }}" || echo "No cached build to drop."
 
       - name: Restore dependencies
         id: restore
@@ -245,14 +257,14 @@ jobs:
           name: validator-${{ github.sha }}
       - name: Unpack the validator
         run: tar -xf validator.tar
-      # Reports what the static load finds. The system profiles carry known duplicates from upstream
-      # (the Snapmaker vendor's "Generic ..." filaments), so this step informs and does not block,
-      # like upstream's check_profiles.yml.
+      # Reports what the static load finds, with the duplicate filament subtype check (-f). The system
+      # profiles carry known duplicates from upstream (the Snapmaker vendor's "Generic ..." filaments),
+      # so this step informs and does not block, like upstream's check_profiles.yml.
       - name: Validate every profile (informational)
         continue-on-error: true
         run: |
           Snapmaker_Orca_profile_validator.app/Contents/MacOS/Snapmaker_Orca_profile_validator \
-            -p "${{ github.workspace }}/resources/profiles" -l 2
+            -p "${{ github.workspace }}/resources/profiles" -l 2 -f
       # Slices a two-colour cube through every printer so every custom G-code template shipped is
       # expanded - the check upstream's CI ran on every engine change.
       - name: Slice every profile

@@ -76,7 +76,7 @@ jobs:
             echo "have_validator=true" >> "${GITHUB_OUTPUT}"
           else
             echo "have_validator=false" >> "${GITHUB_OUTPUT}"
-            echo "::notice::No profile validator at ${url} - the C++ validator checks are skipped. Publish a nightly build of this repository to enable them."
+            echo "::notice::No profile validator at ${url} - the C++ validator checks are skipped here. The Build macOS workflow's Profile slice check runs them with the validator it builds."
           fi
 
       # Validate all system profiles.

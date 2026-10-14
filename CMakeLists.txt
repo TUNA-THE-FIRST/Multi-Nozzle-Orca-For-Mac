@@ -149,6 +149,12 @@ endif()
 option(SLIC3R_SENTRY            "Enable Sentry crash reporting SDK" ${SLIC3R_SENTRY_DEFAULT})
 # SnapLog event/log upload to the Snapmaker cloud. Follows the Sentry default: off for Flatpak.
 option(SLIC3R_SNAPLOG "Compile the SnapLog upload (runtime consent still required)" ${SLIC3R_SENTRY_DEFAULT})
+if (APPLE)
+    # Snapmaker Orca Mac never sends crashes or logs to Snapmaker. Forced, not a default: a build folder
+    # left from an official Snapmaker Orca build keeps these ON in its cache otherwise.
+    set(SLIC3R_SENTRY OFF CACHE BOOL "Enable Sentry crash reporting SDK" FORCE)
+    set(SLIC3R_SNAPLOG OFF CACHE BOOL "Compile the SnapLog upload (runtime consent still required)" FORCE)
+endif()
 set(SNAP_LOG_HMAC_SECRET "c25hcG1ha2VyLU9yY2E" CACHE STRING
     "Public SnapLog gateway signing key (not a user credential); empty disables the anonymous upload path")
 

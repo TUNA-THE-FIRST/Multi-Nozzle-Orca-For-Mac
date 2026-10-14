@@ -753,24 +753,37 @@ void GUI_App::offer_settings_import()
     if (ask.ShowModal() != wxID_YES)
         return;
 
-    // Logs, caches, crash databases and instance locks belong to the other app's own runs.
-    static const std::set<std::string> skipped = { "log", "cache", "SentryData", "tmp" };
-    const fs::path target(data_dir());
-    std::string    failure;
+    // Logs, caches, crash databases, instance locks and queued log uploads belong to the other app's own runs.
+    static const std::set<std::string> skipped = { "log", "cache", "SentryData", "tmp", "log_upload_spool" };
+    const fs::path    target(data_dir());
+    const std::string conf_name = SLIC3R_APP_KEY ".conf";
+    // Copies `from` into `to` and keeps every file already there: nothing of this app is overwritten.
+    std::function<void(const fs::path &, const fs::path &)> copy_tree = [&copy_tree](const fs::path &from, const fs::path &to) {
+        fs::create_directories(to);
+        for (const fs::directory_entry &entry : fs::directory_iterator(from)) {
+            const fs::path to_path = to / entry.path().filename();
+            if (fs::is_symlink(entry.symlink_status()))
+                continue; // points into the other app's folder
+            if (fs::is_directory(entry.status()))
+                copy_tree(entry.path(), to_path);
+            else if (!fs::exists(to_path))
+                fs::copy_file(entry.path(), to_path);
+        }
+    };
+    std::string failure;
     try {
         for (const fs::directory_entry &entry : fs::directory_iterator(source)) {
             const std::string name = entry.path().filename().string();
-            if (skipped.count(name) || boost::ends_with(name, ".lock"))
+            if (skipped.count(name) || boost::ends_with(name, ".lock") || name == conf_name || fs::is_symlink(entry.symlink_status()))
                 continue;
-            if (fs::is_directory(entry.path())) {
-                if (!copy_directory_recursively(entry.path(), target / name, nullptr, true))
-                    failure = entry.path().string();
-            } else {
-                fs::copy_file(entry.path(), target / name, fs::copy_options::overwrite_existing);
-            }
-            if (!failure.empty())
-                break;
+            if (fs::is_directory(entry.status()))
+                copy_tree(entry.path(), target / name);
+            else if (!fs::exists(target / name))
+                fs::copy_file(entry.path(), target / name);
         }
+        // The preferences last, and only after everything else: they name the presets copied above.
+        if (!fs::exists(target / conf_name))
+            fs::copy_file(fs::path(source) / conf_name, target / conf_name);
     } catch (const std::exception &ex) {
         failure = ex.what();
     }
@@ -783,7 +796,8 @@ void GUI_App::offer_settings_import()
                                 "Why this can happen: macOS denied access to the folder, the disk is full, or Snapmaker Orca was "
                                 "changing its files while they were copied.\n\n"
                                 "How to fix it: quit Snapmaker Orca, then in Finder copy the contents of\n%s\ninto\n%s\n"
-                                "while %s is closed. Settings copied so far are kept."),
+                                "while %s is closed. Settings copied so far are kept; your preferences are copied only "
+                                "when everything else was."),
                              from_u8(failure), from_u8(source), from_u8(target.string()), SLIC3R_MAC_APP_NAME),
             _L("Import settings from Snapmaker Orca"), wxOK | wxICON_WARNING).ShowModal();
     }
@@ -795,6 +809,7 @@ void GUI_App::offer_settings_import()
         m_config_corrupted = !app_config->load().empty();
         m_last_config_version = app_config->orig_version();
     }
+    apply_app_config_settings();
     m_shortcuts->load(*app_config);
     init_download_path();
 }
@@ -2981,13 +2996,13 @@ void GUI_App::init_app_config()
                 data_dir_path = boost::filesystem::path(data_dir);
                 set_data_dir(data_dir);
             #ifdef __APPLE__
-                // A first launch finds no settings of its own; remember official Snapmaker Orca's, which
-                // on_init_inner() offers to copy once a dialog can be shown.
+                // A first launch finds no settings folder of its own; remember official Snapmaker Orca's,
+                // which on_init_inner() offers to copy once a dialog can be shown. Only then: a folder
+                // without preferences (deleted to reset them) still holds this app's own presets.
                 {
                     boost::system::error_code ec;
                     const boost::filesystem::path official = data_dir_path.parent_path() / SLIC3R_APP_KEY;
-                    if (official != data_dir_path &&
-                        !boost::filesystem::exists(data_dir_path / (SLIC3R_APP_KEY ".conf"), ec) &&
+                    if (official != data_dir_path && !boost::filesystem::exists(data_dir_path, ec) &&
                         boost::filesystem::exists(official / (SLIC3R_APP_KEY ".conf"), ec))
                         m_settings_import_source = official.string();
                 }
@@ -3066,13 +3081,17 @@ void GUI_App::init_app_config()
         }
 #endif // _WIN32
     }
+    apply_app_config_settings();
+}
+
+void GUI_App::apply_app_config_settings()
+{
     MixedFilamentManager::set_auto_generate_enabled(app_config->get_bool("auto_generate_gradients"));
     // Speed Dial opens on a bare Space from any page by default. Seed the flag so Preferences and the
     // MainFrame shortcut read the same value; an existing config (true or false) is left untouched.
     if (app_config->get("enable_speed_dial").empty())
         app_config->set_bool("enable_speed_dial", true);
     set_logging_level(Slic3r::level_string_to_boost(app_config->get("log_severity_level")));
-
 }
 
 // returns true if found newer version and user agreed to use it
