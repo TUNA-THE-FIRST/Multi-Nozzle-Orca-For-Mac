@@ -19,6 +19,7 @@ class TestPrintHost : public PrintHost
 {
 public:
     using PrintHost::format_error;
+    using PrintHost::http_status_hint;
 
     const char* get_name() const override { return "Test"; }
     bool test(wxString&) const override { return true; }
@@ -66,9 +67,25 @@ struct UploadEvents
     }
 };
 
-std::string format_error(const std::string& body, const std::string& error, unsigned status)
+std::string full_error(const std::string& body, const std::string& error, unsigned status)
 {
     return TestPrintHost().format_error(body, error, status).ToStdString();
+}
+
+// The reason format_error() shows. It explains a known HTTP status after the reason, in a paragraph of
+// its own: checked to be there, then left out.
+std::string format_error(const std::string& body, const std::string& error, unsigned status)
+{
+    std::string       msg  = full_error(body, error, status);
+    const std::string hint = TestPrintHost::http_status_hint(status).ToStdString();
+    if (status != 0 && !hint.empty()) {
+        const std::string suffix = "\n\n" + hint;
+        INFO("actual: " << msg);
+        REQUIRE(msg.size() > suffix.size());
+        REQUIRE(msg.compare(msg.size() - suffix.size(), suffix.size(), suffix) == 0);
+        msg.resize(msg.size() - suffix.size());
+    }
+    return msg;
 }
 
 std::string envelope(int code, const std::string& message, const std::string& traceback)
@@ -260,6 +277,30 @@ TEST_CASE("Error bodies that are not a Moonraker envelope are left unchanged", "
     {
         CHECK(format_error("", "curl:Could not connect", 0) == "curl:Could not connect");
     }
+}
+
+TEST_CASE("A known HTTP status says why it happens and what to do", "[PrintHost]")
+{
+    const unsigned status = GENERATE(400u, 401u, 403u, 404u, 409u, 413u, 415u, 500u, 502u, 503u, 504u);
+    CHECK_FALSE(TestPrintHost::http_status_hint(status).empty());
+    // format_error() checks that the explanation follows the reason.
+    CHECK(format_error(R"JSON({"error": "File not found"})JSON", "", status) == "HTTP " + std::to_string(status) + R"JSON(: {"error": "File not found"})JSON");
+}
+
+TEST_CASE("A connection failure the app recognizes is explained", "[PrintHost]")
+{
+    const std::string timeout = full_error("", "curl:Timeout was reached:\nOperation timed out after 5000 milliseconds\n[Error 28]", 0);
+    CHECK_THAT(timeout, Catch::Matchers::StartsWith("The printer did not answer in time."));
+    CHECK_THAT(timeout, Catch::Matchers::ContainsSubstring("Local Network"));
+
+    const std::string refused = full_error("", "curl:Couldn't connect to server:\nFailed to connect to 192.168.1.20 port 80: Connection refused\n[Error 7]", 0);
+    CHECK_THAT(refused, Catch::Matchers::StartsWith("The printer could not be reached at this address."));
+}
+
+TEST_CASE("A message the caller wrote itself is shown unchanged", "[PrintHost]")
+{
+    const std::string message = GENERATE(as<std::string>{}, "Wrong password", "Unknown error occurred", "ElegooLink not detected");
+    CHECK(full_error("", message, 0) == message);
 }
 
 TEST_CASE("Print host error code is read from a JSON reply", "[PrintHost]")

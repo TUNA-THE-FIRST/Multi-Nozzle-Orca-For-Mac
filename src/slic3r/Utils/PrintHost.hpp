@@ -213,7 +213,12 @@ public:
     virtual nlohmann::json get_auth_info() { return nlohmann::json::object(); }
 
 protected:
+    // "HTTP <status>: <reason>", then why a known status happens and what to do, in a paragraph of its
+    // own; with no status, a known transport error explained, any other error as it is.
     virtual wxString format_error(const std::string &body, const std::string &error, unsigned status) const;
+    // Why a print host answered with an HTTP error status and what to do about it; empty for a status
+    // with nothing useful to say.
+    static wxString http_status_hint(unsigned status);
 
 private:
     std::function<void()> m_connection_lost_cb = nullptr;

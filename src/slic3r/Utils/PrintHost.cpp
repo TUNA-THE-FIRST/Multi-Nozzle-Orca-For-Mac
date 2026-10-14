@@ -191,9 +191,7 @@ int PrintHost::get_err_code_from_body(const std::string &body)
     return root.get<int>("err", 0);
 }
 
-// Why a print host answered with an HTTP error status, and what to do about it; empty for a status
-// with nothing useful to say.
-static wxString http_status_hint(unsigned status)
+wxString PrintHost::http_status_hint(unsigned status)
 {
     switch (status) {
     case 401:
@@ -253,7 +251,8 @@ wxString PrintHost::format_error(const std::string &body, const std::string &err
                _L("The secure (HTTPS) connection to the printer failed, usually because the printer uses a certificate this "
                   "Mac does not trust. Use the printer's http:// address, or add the printer's certificate to the Keychain "
                   "Access app and mark it as trusted.");
-    return wxString::FromUTF8(error.data()) + "\n\n" + unreachable;
+    // Anything else is a message of its own, such as "Wrong password" from the caller: shown as it is.
+    return wxString::FromUTF8(error.data());
 }
 
 
