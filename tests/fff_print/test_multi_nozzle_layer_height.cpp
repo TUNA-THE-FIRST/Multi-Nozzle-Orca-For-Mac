@@ -3505,12 +3505,22 @@ TEST_CASE("The setup dialog's recipes on real models print what the summary says
 {
     const std::string resources = std::string(PROFILES_DIR) + "/../";
     const std::string data      = std::string(TEST_DATA_DIR) + "/";
-    const std::string file = GENERATE_COPY(as<std::string>{}, resources + "handy_models/3DBenchy.drc", resources + "handy_models/Stanford_Bunny.drc",
-                                           resources + "handy_models/calicat.drc", resources + "handy_models/Voron_Design_Cube_v7.drc",
-                                           resources + "handy_models/OrcaCube_v2.drc", resources + "handy_models/ksr_fdmtest_v4.drc",
-                                           resources + "handy_models/OrcaToleranceTest.drc", data + "frog_legs.obj", data + "extruder_idler.obj",
-                                           data + "A.obj", data + "bridge.obj", data + "overhang.obj", data + "sloping_hole.obj",
-                                           data + "cube_with_concave_hole.obj", data + "ipadstand.obj");
+    // U1_STRESS_MODELS (file paths separated by ";") replaces the shipped models, to try your own.
+    std::vector<std::string> files;
+    if (const char *own = std::getenv("U1_STRESS_MODELS"); own != nullptr && *own != 0) {
+        std::stringstream list(own);
+        for (std::string path; std::getline(list, path, ';');)
+            if (!path.empty())
+                files.push_back(path);
+    } else {
+        files = {resources + "handy_models/3DBenchy.drc", resources + "handy_models/Stanford_Bunny.drc",
+                 resources + "handy_models/calicat.drc", resources + "handy_models/Voron_Design_Cube_v7.drc",
+                 resources + "handy_models/OrcaCube_v2.drc", resources + "handy_models/ksr_fdmtest_v4.drc",
+                 resources + "handy_models/OrcaToleranceTest.drc", data + "frog_legs.obj", data + "extruder_idler.obj",
+                 data + "A.obj", data + "bridge.obj", data + "overhang.obj", data + "sloping_hole.obj",
+                 data + "cube_with_concave_hole.obj", data + "ipadstand.obj"};
+    }
+    const std::string file = GENERATE_COPY(from_range(files));
     const std::vector<StressRecipe> recipes = stress_recipes();
     const size_t                    index   = GENERATE_COPY(range(size_t(0), recipes.size()));
     U1Recipe                        recipe  = recipes[index].recipe;
