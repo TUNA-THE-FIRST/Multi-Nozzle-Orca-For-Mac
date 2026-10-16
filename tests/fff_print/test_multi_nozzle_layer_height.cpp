@@ -3491,7 +3491,10 @@ std::vector<StressRecipe> stress_recipes()
 
 std::vector<TriangleMesh> stress_meshes(const std::string &path)
 {
-    Model model = Model::read_from_file(path);
+    // A 3MF only gives up its geometry when LoadModel is asked for; the project's own settings stay out.
+    DynamicPrintConfig        config;
+    ConfigSubstitutionContext substitutions{ForwardCompatibilitySubstitutionRule::Enable};
+    Model model = Model::read_from_file(path, &config, &substitutions, LoadStrategy::AddDefaultInstances | LoadStrategy::LoadModel);
     std::vector<TriangleMesh> out;
     for (ModelObject *object : model.objects)
         if (!object->volumes.empty())
