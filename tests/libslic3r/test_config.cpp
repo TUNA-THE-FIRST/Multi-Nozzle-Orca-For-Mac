@@ -301,6 +301,24 @@ TEST_CASE("Flush-volume warning predicate respects used filament transitions", "
     }
 }
 
+TEST_CASE("A process preset normalized on its own keeps its prime tower filament", "[Config][Regression]")
+{
+    // The command line normalizes each settings file it loads; a process preset has no nozzle_diameter.
+    DynamicPrintConfig process;
+    process.set_deserialize_strict("wipe_tower_filament", "2");
+    REQUIRE_FALSE(process.has("nozzle_diameter"));
+
+    process.normalize_fdm();
+    CHECK(process.opt_int("wipe_tower_filament") == 2);
+
+    SECTION("with the printer's nozzles, a filament the printer does not have is reset")
+    {
+        process.set_deserialize_strict("nozzle_diameter", "0.4");
+        process.normalize_fdm();
+        CHECK(process.opt_int("wipe_tower_filament") == 0);
+    }
+}
+
 // TODO: https://github.com/SoftFever/OrcaSlicer/issues/11269 - Is this test still relevant? Delete if not.
 // It was failing so at least "nozzle_type" and "extruder_printable_area" could not be serialized
 // and an exception was thrown, but "nozzle_type" has been around for at least 3 months now.

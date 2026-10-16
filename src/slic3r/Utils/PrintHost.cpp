@@ -1,5 +1,7 @@
 #include "PrintHost.hpp"
 
+#include <set>
+
 #include <vector>
 #include <thread>
 #include <exception>
@@ -191,24 +193,81 @@ int PrintHost::get_err_code_from_body(const std::string &body)
     return root.get<int>("err", 0);
 }
 
+wxString PrintHost::http_status_hint(unsigned status)
+{
+    switch (status) {
+    case 401:
+    case 403:
+        return _L("The printer refused the request: it needs an API key or password, or the one entered is wrong. Check them "
+                  "in the printer's connection settings (the \"Connect to printer\" button at the right of the printer list).");
+    case 404:
+        return _L("The printer does not know this address. Check the host address, including any port and path, and that the "
+                  "host type matches the printer's software.");
+    case 409:
+        return _L("The printer is busy, printing or handling another file. Wait until it is idle and try again.");
+    case 413:
+        return _L("The file is larger than the printer accepts in one upload. Raise the upload size limit in the printer's "
+                  "web server settings, or make the file smaller, for example with fewer objects on the plate.");
+    case 400:
+    case 415:
+        return _L("The printer did not accept the request. Check that the host type matches the printer's software, and update "
+                  "the printer's firmware.");
+    case 500:
+    case 502:
+    case 503:
+    case 504:
+        return _L("The printer's software ran into a problem. Restart the printer and try again.");
+    default: return {};
+    }
+}
+
+// A reason phrase that only names the status ("Forbidden"), saying nothing of the cause.
+static bool is_bare_reason_phrase(const std::string &reason)
+{
+    static const std::set<std::string> phrases = {"Bad Request", "Unauthorized", "Forbidden", "Not Found", "Conflict",
+                                                  "Payload Too Large", "Request Entity Too Large", "Unsupported Media Type",
+                                                  "Internal Server Error", "Bad Gateway", "Service Unavailable", "Gateway Timeout"};
+    return phrases.count(reason) > 0;
+}
+
 wxString PrintHost::format_error(const std::string &body, const std::string &error, unsigned status) const
 {
     if (status != 0) {
         const std::string reason = moonraker_error_reason(body);
         auto wxbody = wxString::FromUTF8(reason.empty() ? body : reason);
-        return wxString::Format("HTTP %u: %s", status, wxbody);
-    } else {
-        if (error.find("curl:Timeout was reached") != std::string::npos) {
-            return _L("Connection timed out. Please check if the printer and computer network are functioning properly, and confirm that they are on the same network.");
-        }else if(error.find("curl:Couldn't resolve host name")!= std::string::npos){
-            return _L("The Hostname/IP/URL could not be parsed, please check it and try again.");
-        } else if (error.find("Connection was reset") != std::string::npos){
-            return _L("File/data transfer interrupted. Please check the printer and network, then try it again.");
-        }
-        else {
-            return wxString::FromUTF8(error.data());
-        }
+        wxString message = wxString::Format("HTTP %u: %s", status, wxbody);
+        // The printer's own reason ("File is loaded, upload not permitted", "No space left on device")
+        // says more than any general advice for its status, which could even point the wrong way.
+        if (reason.empty() || is_bare_reason_phrase(reason))
+            if (const wxString hint = http_status_hint(status); !hint.empty())
+                message += "\n\n" + hint;
+        return message;
     }
+    // The causes shared by every way of not reaching the printer at all.
+    const wxString unreachable =
+        _L("Why this can happen: the printer is off or asleep, it is on another network than this Mac, its IP address "
+           "changed, or macOS has not allowed this app to use the local network.\n"
+           "How to fix it: check that the printer is on and on the same Wi-Fi, compare its IP address on its screen with the "
+           "one in the printer's connection settings (\"Connect to printer\" at the right of the printer list), and allow Snapmaker Orca Mac under System Settings > Privacy & "
+           "Security > Local Network.");
+    if (error.find("curl:Timeout was reached") != std::string::npos)
+        return _L("The printer did not answer in time.") + "\n\n" + unreachable;
+    if (error.find("curl:Couldn't resolve host name") != std::string::npos)
+        return _L("The printer's address could not be found: the host name is unknown on this network or mistyped. Use the "
+                  "printer's IP address (shown on its screen) instead, and check it for typos.");
+    if (error.find("Couldn't connect to server") != std::string::npos || error.find("Connection refused") != std::string::npos ||
+        error.find("No route to host") != std::string::npos)
+        return _L("The printer could not be reached at this address.") + "\n\n" + unreachable;
+    if (error.find("Connection was reset") != std::string::npos)
+        return _L("The transfer was interrupted: the printer or the network dropped the connection. Check that the printer is "
+                  "still on and its Wi-Fi signal is good, then try again.");
+    if (error.find("SSL") != std::string::npos || error.find("certificate") != std::string::npos)
+        return wxString::FromUTF8(error.data()) + "\n\n" +
+               _L("The secure (HTTPS) connection to the printer failed, usually because the printer uses a certificate this "
+                  "Mac does not trust. Use the printer's http:// address, or add the printer's certificate to the Keychain "
+                  "Access app and mark it as trusted.");
+    // Anything else is a message of its own, such as "Wrong password" from the caller: shown as it is.
+    return wxString::FromUTF8(error.data());
 }
 
 

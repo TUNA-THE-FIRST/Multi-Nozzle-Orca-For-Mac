@@ -51,14 +51,16 @@ static void unmount_callback(DADiskRef disk, DADissenterRef dissenter, void *con
     for(NSURL *volURL in mountedRemovableMedia)
     {
         int                 err = 0;
-        DADiskRef           disk;
+        DADiskRef           disk = nullptr;
         CFDictionaryRef     descDict = nullptr;        
         DASessionRef        session = DASessionCreate(nullptr);
         if (session == nullptr)
             err = EINVAL;
         if (err == 0) {
+            // Volumes that are no disk to DiskArbitration (some network shares, virtual file
+            // systems) give no disk; reading its description would dereference null.
             disk = DADiskCreateFromVolumePath(nullptr,session,(CFURLRef)volURL);
-            if (session == nullptr)
+            if (disk == nullptr)
                 err = EINVAL;
         }
         if (err == 0) {
@@ -90,6 +92,10 @@ static void unmount_callback(DADiskRef disk, DADissenterRef dissenter, void *con
         }
         if (descDict != nullptr)
             CFRelease(descDict);
+        if (disk != nullptr)
+            CFRelease(disk);
+        if (session != nullptr)
+            CFRelease(session);
     }
     return result;
 }
@@ -97,7 +103,7 @@ static void unmount_callback(DADiskRef disk, DADissenterRef dissenter, void *con
 //this eject drive is not used now
 -(void)eject_drive:(NSString *)path
 {
-    NSURL *url = [[NSURL alloc] initFileURLWithPath:path];
+    NSURL *url = [NSURL fileURLWithPath:path];
     DASessionRef session = DASessionCreate(nullptr);
     int err = 0;
     if (session == nullptr)
@@ -105,7 +111,7 @@ static void unmount_callback(DADiskRef disk, DADissenterRef dissenter, void *con
     DADiskRef disk = nullptr;
     if (err == 0)
         disk = DADiskCreateFromVolumePath(nullptr, session, (CFURLRef)url);
-    if (err == 0)
+    if (err == 0 && disk != nullptr)
         //DADiskUnmount(disk, kDADiskUnmountOptionDefault, nullptr, nullptr);
         DADiskUnmount(disk, kDADiskUnmountOptionWhole | kDADiskUnmountOptionForce, unmount_callback, nullptr);
     if (disk != nullptr)
@@ -130,6 +136,7 @@ void RemovableDriveManager::register_window_osx()
 void RemovableDriveManager::unregister_window_osx()
 {
     if (m_impl_osx) {
+        [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:(id)m_impl_osx];
         [(id)m_impl_osx release];
         m_impl_osx = nullptr;
     }
@@ -155,8 +162,10 @@ void RemovableDriveManager::eject_device(const std::string &path)
 {
     assert(m_impl_osx != nullptr);
     if (m_impl_osx) {
-        NSString * pth = [NSString stringWithCString:path.c_str() encoding:[NSString defaultCStringEncoding]];
-        [(id)m_impl_osx eject_drive:pth];
+        // Volume names can have accents ("Cartão SD"); paths are UTF-8.
+        NSString * pth = [NSString stringWithUTF8String:path.c_str()];
+        if (pth != nil)
+            [(id)m_impl_osx eject_drive:pth];
     }
 }
 

@@ -654,7 +654,7 @@ INNER
     echo "---"
     # Single-quoted on purpose: the backticks below are markdown, not command substitution.
     # shellcheck disable=SC2016
-    echo '*Fix the errors above and push a new commit. To reproduce this run locally: `scripts/check_profile.sh`, or `scripts\check_profile.bat` on Windows.*'
+    echo '*Fix the errors above and push a new commit. To reproduce this run locally: `scripts/check_profile.sh`.*'
 } > "${WORK_DIR}/pr_comment.md"
 
 printf '\n%sOne or more profile checks failed.%s Logs: %s\n' "${C_RED}" "${C_RESET}" "${LOG_DIR}"

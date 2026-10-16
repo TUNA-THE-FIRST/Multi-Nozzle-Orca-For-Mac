@@ -19,6 +19,22 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
+#include "libslic3r_version.h"
+
+// The version files and the app config are read at every launch; a damaged or half-written one
+// (an interrupted update, a crash while saving) must read as empty instead of throwing.
+static nlohmann::json read_json_object(std::ifstream &file)
+{
+    nlohmann::json json = nlohmann::json::parse(file, nullptr, /* allow_exceptions */ false);
+    return json.is_object() ? json : nlohmann::json::object();
+}
+
+static std::string json_string(const nlohmann::json &object, const char *key)
+{
+    auto it = object.find(key);
+    return it != object.end() && it->is_string() ? it->get<std::string>() : std::string();
+}
+
 #ifdef __linux__
 static std::string get_linux_config_dir()
 {
@@ -106,7 +122,7 @@ namespace common
 #elif __APPLE__
         const char* home_env = getenv("HOME");
         versionFilePath      = home_env;
-        versionFilePath      = versionFilePath + "/Library/Application Support/Snapmaker_Orca/system/Snapmaker.json";
+        versionFilePath      = versionFilePath + "/Library/Application Support/" SLIC3R_DATA_DIR_NAME "/system/Snapmaker.json";
 #else
         std::string config_dir = get_linux_config_dir();
         if (!config_dir.empty())
@@ -117,9 +133,8 @@ namespace common
             std::ifstream json_file(versionFilePath);
             return "";
         }
-        nlohmann::json json_data;
-        json_file >> json_data;
-        std::string str_version      = json_data.value("version", "");
+        const nlohmann::json json_data = read_json_object(json_file);
+        std::string str_version      = json_string(json_data, "version");
 
         return str_version;
     }
@@ -146,7 +161,7 @@ namespace common
 #elif __APPLE__
             const char* home_env = getenv("HOME");
             versionFilePath      = home_env;
-            versionFilePath      = versionFilePath + "/Library/Application Support/Snapmaker_Orca/web/flutter_web/version.json";
+            versionFilePath      = versionFilePath + "/Library/Application Support/" SLIC3R_DATA_DIR_NAME "/web/flutter_web/version.json";
 #else
             std::string config_dir = get_linux_config_dir();
             if (!config_dir.empty())
@@ -158,10 +173,9 @@ namespace common
                 std::ifstream json_file(versionFilePath);                
                 return "";
             }
-            nlohmann::json json_data;
-            json_file >> json_data;
-            std::string str_version = json_data.value("version", "");
-            std::string str_build_number = json_data.value("build_number", "");
+            const nlohmann::json json_data = read_json_object(json_file);
+            std::string str_version = json_string(json_data, "version");
+            std::string str_build_number = json_string(json_data, "build_number");
 
             std::string flutter_version = std::string("flutter_version: ") + str_version + std::string("  ") + std::string("build_number: ") +
                               str_build_number;
@@ -194,7 +208,7 @@ namespace common
 #elif __APPLE__
         const char* home_env = getenv("HOME");
         versionFilePath      = home_env;
-        cfgfile              = versionFilePath + "/Library/Application Support/Snapmaker_Orca/Snapmaker_Orca.conf";
+        cfgfile              = versionFilePath + "/Library/Application Support/" SLIC3R_DATA_DIR_NAME "/" SLIC3R_APP_KEY ".conf";
 #else
         std::string config_dir = get_linux_config_dir();
         if (!config_dir.empty())
@@ -206,11 +220,10 @@ namespace common
             return "";
         }
 
-        nlohmann::json json_data;
-        json_file >> json_data;
-
-        auto dataObj    = json_data.value("app", nlohmann::json::object());
-        localArea = dataObj.value("region", "");
+        const nlohmann::json json_data = read_json_object(json_file);
+        auto app = json_data.find("app");
+        if (app != json_data.end() && app->is_object())
+            localArea = json_string(*app, "region");
 
         return localArea;
     }
@@ -238,7 +251,7 @@ namespace common
 #elif __APPLE__
         const char* home_env = getenv("HOME");
         versionFilePath      = home_env;
-        cfgfile              = versionFilePath + "/Library/Application Support/Snapmaker_Orca/Snapmaker_Orca.conf";
+        cfgfile              = versionFilePath + "/Library/Application Support/" SLIC3R_DATA_DIR_NAME "/" SLIC3R_APP_KEY ".conf";
 #else
         std::string config_dir = get_linux_config_dir();
         if (!config_dir.empty())
@@ -250,11 +263,10 @@ namespace common
             return "";
         }
 
-        nlohmann::json json_data;
-        json_file >> json_data;
-
-       auto dataObj  = json_data.value("app", nlohmann::json::object());
-       localLanguage = dataObj.value("language", "");
+        const nlohmann::json json_data = read_json_object(json_file);
+        auto app = json_data.find("app");
+        if (app != json_data.end() && app->is_object())
+            localLanguage = json_string(*app, "language");
 
        return localLanguage;
     }

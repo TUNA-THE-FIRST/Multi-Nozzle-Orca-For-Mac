@@ -1071,14 +1071,16 @@ wxWindow *CreateFilamentPresetDialog::create_dialog_buttons()
             }
         } else {
             if (m_filament_custom_vendor_input->GetTextCtrl()->GetValue().empty()) {
-                MessageDialog dlg(this, _L("Custom vendor missing; please input custom vendor."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+                MessageDialog dlg(this, _L("Enter a vendor name: the filament's brand, used in the preset's name."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                                   wxYES | wxYES_DEFAULT | wxCENTRE);
                 dlg.ShowModal();
                 return;
             } else {
                 vendor_name = into_u8(m_filament_custom_vendor_input->GetTextCtrl()->GetValue());
                 if (vendor_name == "Bambu" || vendor_name == "Generic") {
-                    MessageDialog dlg(this, _L("\"Bambu\" or \"Generic\" cannot be used as a Vendor for custom filaments."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+                    MessageDialog dlg(this, _L("\"Bambu\" and \"Generic\" are reserved for the built-in filament "
+                                               "profiles, so a custom filament can't use them as its vendor. Enter "
+                                               "another vendor name."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                                       wxYES | wxYES_DEFAULT | wxCENTRE);
                     dlg.ShowModal();
                     return;
@@ -1100,7 +1102,8 @@ wxWindow *CreateFilamentPresetDialog::create_dialog_buttons()
         wxString    serial_str = m_filament_serial_input->GetTextCtrl()->GetValue();
         std::string serial_name;
         if (serial_str.empty()) {
-            MessageDialog dlg(this, _L("Filament serial missing; please input serial."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+            MessageDialog dlg(this, _L("Enter the filament's serial: its product line (for example Basic or Matte), "
+                                       "used in the preset's name."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                               wxYES | wxYES_DEFAULT | wxCENTRE);
             dlg.ShowModal();
             return;
@@ -1125,7 +1128,7 @@ wxWindow *CreateFilamentPresetDialog::create_dialog_buttons()
             return;
         }
         if (m_can_not_find_vendor_checkbox->GetValue() && str_is_all_digit(vendor_name)) {
-            MessageDialog dlg(this, _L("The vendor cannot be a number; please re-enter."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+            MessageDialog dlg(this, _L("The vendor name can't be just a number. Enter the filament's brand name."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                               wxYES | wxYES_DEFAULT | wxCENTRE);
             dlg.ShowModal();
             return;
@@ -1168,7 +1171,16 @@ wxWindow *CreateFilamentPresetDialog::create_dialog_buttons()
                     if (!res) {
                         std::string failure_names;
                         for (std::string &failure : failures) { failure_names += failure + "\n"; }
-                        MessageDialog dlg(this, _L("Some existing presets have failed to be created, as follows:\n") + from_u8(failure_names) + _L("\nDo you want to rewrite it?"),
+                        MessageDialog dlg(this, _L("Presets with these names already exist, so they were not created:"
+                                                   "\n") + from_u8(failure_names) + _L("\n"
+                                                                                                                                                   "Replace "
+                                                                                                                                                   "the "
+                                                                                                                                                   "existing "
+                                                                                                                                                   "presets "
+                                                                                                                                                   "with "
+                                                                                                                                                   "the "
+                                                                                                                                                   "new "
+                                                                                                                                                   "ones?"),
                                           wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES_NO | wxYES_DEFAULT | wxCENTRE);
                         if (dlg.ShowModal() == wxID_YES) {
                             res = preset_bundle->filaments.clone_presets_for_filament(checked_preset, failures, filament_preset_name, user_filament_id, dynamic_config,
@@ -1195,7 +1207,16 @@ wxWindow *CreateFilamentPresetDialog::create_dialog_buttons()
                     if (!res) {
                         std::string failure_names;
                         for (std::string &failure : failures) { failure_names += failure + "\n"; }
-                        MessageDialog dlg(this, _L("Some existing presets have failed to be created, as follows:\n") + from_u8(failure_names) + _L("\nDo you want to rewrite it?"),
+                        MessageDialog dlg(this, _L("Presets with these names already exist, so they were not created:"
+                                                   "\n") + from_u8(failure_names) + _L("\n"
+                                                                                                                                                   "Replace "
+                                                                                                                                                   "the "
+                                                                                                                                                   "existing "
+                                                                                                                                                   "presets "
+                                                                                                                                                   "with "
+                                                                                                                                                   "the "
+                                                                                                                                                   "new "
+                                                                                                                                                   "ones?"),
                                           wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES_NO | wxYES_DEFAULT | wxCENTRE);
                         if (wxID_YES == dlg.ShowModal()) {
                             res = preset_bundle->filaments.clone_presets_for_filament(checked_preset, failures, filament_preset_name, user_filament_id, dynamic_config,
@@ -2146,9 +2167,11 @@ void CreatePrinterPresetDialog::load_texture() {
     bool try_ok;
     if (Utils::is_file_too_large(file_name, try_ok)) {
         if (try_ok) {
-            m_upload_svg_tip_text->SetLabelText(wxString::Format(_L("The file exceeds %d MB, please import again."), STL_SVG_MAX_FILE_SIZE_MB));
+            m_upload_svg_tip_text->SetLabelText(wxString::Format(_L("The file is larger than %d MB, the most this "
+                                                                    "window accepts. Choose a smaller file."), STL_SVG_MAX_FILE_SIZE_MB));
         } else {
-            m_upload_svg_tip_text->SetLabelText(_L("Exception in obtaining file size, please import again."));
+            m_upload_svg_tip_text->SetLabelText(_L("The file's size could not be read: it may have been moved or "
+                                                   "deleted. Choose the file again."));
         }
         return;
     }
@@ -2176,10 +2199,12 @@ void CreatePrinterPresetDialog::load_model_stl()
     bool try_ok;
     if (Utils::is_file_too_large(file_name, try_ok)) {
         if (try_ok) {
-            m_upload_stl_tip_text->SetLabelText(wxString::Format(_L("The file exceeds %d MB, please import again."), STL_SVG_MAX_FILE_SIZE_MB));
+            m_upload_stl_tip_text->SetLabelText(wxString::Format(_L("The file is larger than %d MB, the most this "
+                                                                    "window accepts. Choose a smaller file."), STL_SVG_MAX_FILE_SIZE_MB));
         }
         else {
-            m_upload_stl_tip_text->SetLabelText(_L("Exception in obtaining file size, please import again."));
+            m_upload_stl_tip_text->SetLabelText(_L("The file's size could not be read: it may have been moved or "
+                                                   "deleted. Choose the file again."));
         }
         return;
     }
@@ -2236,7 +2261,8 @@ bool CreatePrinterPresetDialog::load_system_and_user_presets_with_curr_model(Pre
                                                              wxGetApp().preset_bundle);
         } catch (...) {
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "load vendor fonfigs form json failed";
-            MessageDialog dlg(this, _L("The printer model was not found, please reselect."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+            MessageDialog dlg(this, _L("The selected printer model was not found among the installed profiles. "
+                                       "Choose it again from the list."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                               wxYES_NO | wxYES_DEFAULT | wxCENTRE);
             dlg.ShowModal();
             return false;
@@ -2262,7 +2288,8 @@ bool CreatePrinterPresetDialog::load_system_and_user_presets_with_curr_model(Pre
         varient = model_varient.substr(index_at + 3, index_nozzle - index_at - 4);
     } else {
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "get nozzle failed";
-        MessageDialog dlg(this, _L("The nozzle diameter was not found; please reselect."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES_NO | wxYES_DEFAULT | wxCENTRE);
+        MessageDialog dlg(this, _L("This printer has no profile for the selected nozzle diameter. Choose another "
+                                   "nozzle diameter from the list."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES_NO | wxYES_DEFAULT | wxCENTRE);
         dlg.ShowModal();
         return false;
     }
@@ -2273,7 +2300,8 @@ bool CreatePrinterPresetDialog::load_system_and_user_presets_with_curr_model(Pre
     if (temp_printer_preset) {
         m_printer_preset = new Preset(*temp_printer_preset);
     } else {
-        MessageDialog dlg(this, _L("The printer preset was not found; please reselect."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES_NO | wxYES_DEFAULT | wxCENTRE);
+        MessageDialog dlg(this, _L("The selected printer preset was not found: it may have been deleted or renamed. "
+                                   "Choose it again from the list."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES_NO | wxYES_DEFAULT | wxCENTRE);
         dlg.ShowModal();
         return false;
     }
@@ -2299,7 +2327,8 @@ bool CreatePrinterPresetDialog::load_system_and_user_presets_with_curr_model(Pre
                                                              ForwardCompatibilitySubstitutionRule::EnableSilent);
         } catch (...) {
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "load template vendor configs form json failed";
-            MessageDialog dlg(this, _L("The printer model was not found, please reselect."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+            MessageDialog dlg(this, _L("The selected printer model was not found among the installed profiles. "
+                                       "Choose it again from the list."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                               wxYES_NO | wxYES_DEFAULT | wxCENTRE);
             dlg.ShowModal();
             return false;
@@ -2813,7 +2842,16 @@ wxWindow *CreatePrinterPresetDialog::create_page2_dialog_buttons(wxWindow *paren
                 if (!create_preset_result) {
                     std::string message;
                     for (const std::string &failure : failures) { message += "\t" + failure + "\n"; }
-                    MessageDialog dlg(this, _L("Create filament presets failed. As follows:\n") + from_u8(message) + _L("\nDo you want to rewrite it?"),
+                    MessageDialog dlg(this, _L("These filament presets could not be created, usually because presets "
+                                               "with the same names already exist:\n") + from_u8(message) + _L("\n"
+                                                                                                                        "Replace "
+                                                                                                                        "the "
+                                                                                                                        "existing "
+                                                                                                                        "presets "
+                                                                                                                        "with "
+                                                                                                                        "the "
+                                                                                                                        "new "
+                                                                                                                        "ones?"),
                                       wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                                       wxYES | wxYES_DEFAULT | wxCENTRE);
                     int res = dlg.ShowModal();
@@ -2839,7 +2877,16 @@ wxWindow *CreatePrinterPresetDialog::create_page2_dialog_buttons(wxWindow *paren
                 if (!create_preset_result) {
                     std::string message;
                     for (const std::string &failure : failures) { message += "\t" + failure + "\n"; }
-                    MessageDialog dlg(this, _L("Create process presets failed. As follows:\n") + from_u8(message) + _L("\nDo you want to rewrite it?"),
+                    MessageDialog dlg(this, _L("These process presets could not be created, usually because presets "
+                                               "with the same names already exist:\n") + from_u8(message) + _L("\n"
+                                                                                                                       "Replace "
+                                                                                                                       "the "
+                                                                                                                       "existing "
+                                                                                                                       "presets "
+                                                                                                                       "with "
+                                                                                                                       "the "
+                                                                                                                       "new "
+                                                                                                                       "ones?"),
                                       wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                                       wxYES | wxYES_DEFAULT | wxCENTRE);
                     int res = dlg.ShowModal();
@@ -2862,7 +2909,16 @@ wxWindow *CreatePrinterPresetDialog::create_page2_dialog_buttons(wxWindow *paren
                     for (const std::string& failure : failures) {
                         message += "\t" + failure + "\n";
                     }
-                    MessageDialog dlg(this, _L("Create filament presets failed. As follows:\n") + from_u8(message) + _L("\nDo you want to rewrite it?"),
+                    MessageDialog dlg(this, _L("These filament presets could not be created, usually because presets "
+                                               "with the same names already exist:\n") + from_u8(message) + _L("\n"
+                                                                                                                        "Replace "
+                                                                                                                        "the "
+                                                                                                                        "existing "
+                                                                                                                        "presets "
+                                                                                                                        "with "
+                                                                                                                        "the "
+                                                                                                                        "new "
+                                                                                                                        "ones?"),
                                       wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                                       wxYES | wxYES_DEFAULT | wxCENTRE);
                     int           res = dlg.ShowModal();
@@ -2884,7 +2940,16 @@ wxWindow *CreatePrinterPresetDialog::create_page2_dialog_buttons(wxWindow *paren
                     for (const std::string& failure : failures) {
                         message += "\t" + failure + "\n";
                     }
-                    MessageDialog dlg(this, _L("Create process presets failed. As follows:\n") + from_u8(message) + _L("\nDo you want to rewrite it?"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
+                    MessageDialog dlg(this, _L("These process presets could not be created, usually because presets "
+                                               "with the same names already exist:\n") + from_u8(message) + _L("\n"
+                                                                                                                       "Replace "
+                                                                                                                       "the "
+                                                                                                                       "existing "
+                                                                                                                       "presets "
+                                                                                                                       "with "
+                                                                                                                       "the "
+                                                                                                                       "new "
+                                                                                                                       "ones?"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
                     int           res = dlg.ShowModal();
                     if (wxID_YES == res) {
                         create_preset_result = preset_bundle->prints.clone_presets_for_printer(selected_process_presets, failures, printer_preset_name, get_filament_id, true);
@@ -3022,7 +3087,8 @@ void CreatePrinterPresetDialog::on_select_printer_model(wxCommandEvent &e)
             return;
         }
 
-        MessageDialog dlg(this, _L("Vendor was not found; please reselect."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES_NO | wxYES_DEFAULT | wxCENTRE);
+        MessageDialog dlg(this, _L("The selected vendor was not found among the installed profiles. Choose it again "
+                                   "from the list."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES_NO | wxYES_DEFAULT | wxCENTRE);
         dlg.ShowModal();
         return;
     }
@@ -3346,7 +3412,8 @@ bool CreatePrinterPresetDialog::validate_input_valid()
         nozzle_dia = my_stof(nozzle_diameter);
     } catch (...) { }
     if (nozzle_dia == 0) {
-        MessageDialog dlg(this, _L("The entered nozzle diameter is invalid, please re-enter:\n"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+        MessageDialog dlg(this, _L("The nozzle diameter must be a number greater than 0, for example 0.4. Enter it "
+                                   "again:\n"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                           wxOK | wxYES_DEFAULT | wxCENTRE);
         int           res = dlg.ShowModal();
         return false;
@@ -3596,19 +3663,27 @@ void ExportConfigsDialog::show_export_result(const ExportCase &export_case)
     MessageDialog *msg_dlg = nullptr;
     switch (export_case) {
     case ExportCase::INITIALIZE_FAIL:
-        msg_dlg = new MessageDialog(this, _L("initialize fail"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
+        msg_dlg = new MessageDialog(this, _L("The export file could not be created in the chosen folder: the folder "
+                                             "may be read-only or the disk full. Choose another folder, for example "
+                                             "Documents, and export again."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
         break;
     case ExportCase::ADD_FILE_FAIL:
-        msg_dlg = new MessageDialog(this, _L("add file fail"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
+        msg_dlg = new MessageDialog(this, _L("A preset could not be added to the export file: the disk may be full. "
+                                             "Free some space or choose another folder, and export again."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
         break;
     case ExportCase::ADD_BUNDLE_STRUCTURE_FAIL:
-        msg_dlg = new MessageDialog(this, _L("add bundle structure file fail"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
+        msg_dlg = new MessageDialog(this, _L("The bundle's index could not be added to the export file: the disk may "
+                                             "be full. Free some space or choose another folder, and export again."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
         break;
     case ExportCase::FINALIZE_FAIL:
-        msg_dlg = new MessageDialog(this, _L("finalize fail"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
+        msg_dlg = new MessageDialog(this, _L("The export file could not be finished: the disk may be full or the "
+                                             "folder was removed. Free some space or choose another folder, and "
+                                             "export again."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
         break;
     case ExportCase::OPEN_ZIP_WRITTEN_FILE:
-        msg_dlg = new MessageDialog(this, _L("open zip written fail"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
+        msg_dlg = new MessageDialog(this, _L("The export file could not be written in the chosen folder: the folder "
+                                             "may be read-only or the disk full. Choose another folder, for example "
+                                             "Documents, and export again."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
         break;
     case ExportCase::EXPORT_SUCCESS:
         msg_dlg = new MessageDialog(this, _L("Export successful"), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
@@ -4331,7 +4406,8 @@ void ExportConfigsDialog::data_init()
         }
     }
     if (!temp_folder_exist) {
-        MessageDialog dlg(this, _L("Failed to create temporary folder, please try Export Configs again."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES_NO | wxYES_DEFAULT | wxCENTRE);
+        MessageDialog dlg(this, _L("A temporary folder for the export could not be created: the disk may be full. "
+                                   "Free some space and export the configs again."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES_NO | wxYES_DEFAULT | wxCENTRE);
         dlg.ShowModal();
         EndModal(wxCANCEL);
     }
@@ -4945,7 +5021,15 @@ wxWindow *CreatePresetForPrinterDialog::create_dialog_buttons()
             if (!res) {
                 std::string failure_names;
                 for (std::string &failure : failures) { failure_names += failure + "\n"; }
-                MessageDialog dlg(this, _L("Some existing presets have failed to be created, as follows:\n") + from_u8(failure_names) + _L("\nDo you want to rewrite it?"),
+                MessageDialog dlg(this, _L("Presets with these names already exist, so they were not created:\n") + from_u8(failure_names) + _L("\n"
+                                                                                                                                           "Replace "
+                                                                                                                                           "the "
+                                                                                                                                           "existing "
+                                                                                                                                           "presets "
+                                                                                                                                           "with "
+                                                                                                                                           "the "
+                                                                                                                                           "new "
+                                                                                                                                           "ones?"),
                                   wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES_NO | wxYES_DEFAULT | wxCENTRE);
                 if (dlg.ShowModal() == wxID_YES) {
                     res = preset_bundle->filaments.clone_presets_for_filament(filament_preset.get(), failures, m_filament_name, m_filament_id, dynamic_config, printer_name, true);

@@ -40,7 +40,8 @@
 #include "wx/evtloop.h"
 
 static std::map<int, std::string> error_messages = {
-    {1, L("The device cannot handle more conversations. Please retry later.")},
+    {1, L("The printer is already connected to too many apps (for example Bambu Handy or another computer). Close "
+          "the other connections, or wait a minute, and try again.")},
     {2, L("Player is malfunctioning. Please reinstall the system player.")},
     {100, L("The player is not loaded; please click the \"play\" button to retry.")},
     {101, L("The player is not loaded; please click the \"play\" button to retry.")},
@@ -619,7 +620,8 @@ void MediaPlayCtrl::Stop(wxString const &msg, wxString const &msg2)
                 : _L(iter->second.c_str());
             if (m_failed_code == 1) {
                 if (m_last_state == wxMEDIASTATE_PLAYING)
-                    msg2 = _L("The printer has been logged out and cannot connect.");
+                    msg2 = _L("The printer is signed out of your Bambu account, so the app can't connect to it. Bind "
+                              "the printer to your account again, or connect to it in LAN mode.");
             }
 #if !BBL_RELEASE_TO_PUBLIC && defined(__WINDOWS__)
             if (m_failed_code < 0)
@@ -807,7 +809,8 @@ void MediaPlayCtrl::ToggleStream()
         CallAfter([this, m, url] {
             if (m != m_machine) return;
             if (url.empty() || !boost::algorithm::starts_with(url, "bambu:///")) {
-                MessageDialog(this->GetParent(), wxString::Format(_L("Virtual camera initialize failed (%s)!"), url.empty() ? _L("Network unreachable") : from_u8(url)), _L("Information"),
+                MessageDialog(this->GetParent(), wxString::Format(_L("The virtual camera could not be started (%s). "
+                                                                     "Restart the app and try again."), url.empty() ? _L("Network unreachable") : from_u8(url)), _L("Information"),
                               wxICON_INFORMATION)
                     .ShowModal();
                 return;

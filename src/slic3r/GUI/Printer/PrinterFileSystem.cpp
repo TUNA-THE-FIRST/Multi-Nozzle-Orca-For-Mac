@@ -52,11 +52,16 @@ static wxBitmap default_thumbnail;
 
 static std::map<int, std::string> error_messages = {
      {PrinterFileSystem::ERROR_PIPE, L("Reconnecting the printer, the operation cannot be completed immediately, please try again later.")},
-     {PrinterFileSystem::ERROR_RES_BUSY, L("The device cannot handle more conversations. Please retry later.")},
+     {PrinterFileSystem::ERROR_RES_BUSY, L("The printer is already connected to too many apps\n(for example Bambu "
+                                           "Handy or another computer).\nClose the other connections, or wait a "
+                                           "minute, and try again.")},
      {PrinterFileSystem::ERROR_TIME_OUT, L("Timeout, please try again.")},
      {PrinterFileSystem::FILE_NO_EXIST, L("File does not exist.")},
-     {PrinterFileSystem::FILE_CHECK_ERR, L("File checksum error. Please retry.")},
-     {PrinterFileSystem::FILE_TYPE_ERR, L("Not supported on the current printer version.")},
+     {PrinterFileSystem::FILE_CHECK_ERR, L("The file arrived damaged on the printer (its checksum doesn't match), "
+                                           "usually because the Wi-Fi connection dropped during the transfer. Send "
+                                           "it again.")},
+     {PrinterFileSystem::FILE_TYPE_ERR, L("The printer's firmware is too old for this. Update the printer's firmware "
+                                          "and try again.")},
      {PrinterFileSystem::STORAGE_UNAVAILABLE, L("Please check if the storage is inserted into the printer.\nIf it still cannot be read, you can try formatting the storage.")},
      {PrinterFileSystem::API_VERSION_UNSUPPORT, L("The firmware version of the printer is too low. Please update the firmware and try again.")},
      {PrinterFileSystem::FILE_EXIST, L("The file already exists, do you want to replace it?")},

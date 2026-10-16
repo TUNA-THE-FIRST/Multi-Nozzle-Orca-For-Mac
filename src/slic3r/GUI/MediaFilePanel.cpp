@@ -490,7 +490,8 @@ void MediaFilePanel::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
         return;
     }
     if (m_lan_mode) {
-        m_image_grid->SetStatus(m_bmp_failed, _L("Browsing file in storage is not supported in LAN Only Mode."));
+        m_image_grid->SetStatus(m_bmp_failed, _L("The printer's files can't be browsed in LAN Only mode.\nTurn LAN Only mode off on the "
+                                                 "printer's screen,\nor take out the storage card and open it on your Mac."));
         fs->SetUrl("0");
         return;
     }
@@ -566,7 +567,8 @@ void MediaFilePanel::doAction(size_t index, int action)
                     if (result == PrinterFileSystem::ERROR_CANCEL)
                         return;
                     if (result != 0) {
-                        wxString msg = data.empty() ? _L("Failed to fetch model information from printer.") :
+                        wxString msg = data.empty() ? _L("The model's details could not be read from the printer, "
+                                                         "usually because the connection dropped. Try again.") :
                                                       from_u8(data);
                         CallAfter([this, msg] {
                             MessageDialog(this, msg, _L_CONTEXT("Print", "Verb"), wxOK).ShowModal();
@@ -581,7 +583,8 @@ void MediaFilePanel::doAction(size_t index, int action)
                     if (!Slic3r::load_gcode_3mf_from_stream(is, &config, &model, &plate_data_list, &file_version)
                             || plate_data_list.empty()) {
                         MessageDialog(this,
-                            _L("Failed to parse model information."),
+                            _L("The model's details from the printer could not be read: the file on the printer may "
+                               "be damaged or made by another app. Slice and send it again."),
                             _L_CONTEXT("Print", "Verb"), wxOK).ShowModal();
                         return;
                     }
@@ -615,7 +618,8 @@ void MediaFilePanel::doAction(size_t index, int action)
                 if (!file.local_path.empty()) {
                     if (!fs->DownloadCheckFile(index)) {
                         MessageDialog(this,
-                            wxString::Format(_L("File '%s' was lost! Please download it again."), from_u8(file.name)),
+                            wxString::Format(_L("The file '%s' is no longer on the printer: it was deleted, or the "
+                                                "storage card was taken out. Send it to the printer again."), from_u8(file.name)),
                             _L("Error"), wxOK).ShowModal();
                         Refresh();
                         return;
@@ -641,7 +645,8 @@ void MediaFilePanel::doAction(size_t index, int action)
                 if (!file.local_path.empty()) {
                     if (!fs->DownloadCheckFile(index)) {
                         MessageDialog(this,
-                            wxString::Format(_L("File '%s' was lost! Please download it again."), from_u8(file.name)),
+                            wxString::Format(_L("The file '%s' is no longer on the printer: it was deleted, or the "
+                                                "storage card was taken out. Send it to the printer again."), from_u8(file.name)),
                             _L("Error"), wxOK).ShowModal();
                         Refresh();
                         return;

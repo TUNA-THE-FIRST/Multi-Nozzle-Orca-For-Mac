@@ -214,7 +214,8 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
         m_printhost_test_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
             std::unique_ptr<PrintHost> host(PrintHost::get_print_host(m_config));
             if (!host) {
-                const wxString text = _L("Could not get a valid Printer Host reference");
+                const wxString text = _L("This host type is not supported, so the connection can't be tested. Choose "
+                                         "another host type for this printer.");
                 show_error(this, text);
                 return;
             }
@@ -272,7 +273,8 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
         m_printhost_generate_creds_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
             std::unique_ptr<PrintHost> host(PrintHost::get_print_host(m_config));
             if (!host) {
-                const wxString text = _L("Could not get a valid Printer Host reference");
+                const wxString text = _L("This host type is not supported, so this can't be done. Choose another host "
+                                         "type for this printer.");
                 show_error(this, text);
                 return;
             }
@@ -308,7 +310,8 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
         m_printhost_logout_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
             std::unique_ptr<PrintHost> host(PrintHost::get_print_host(m_config));
             if (!host) {
-                const wxString text = _L("Could not get a valid Printer Host reference");
+                const wxString text = _L("This host type is not supported, so this can't be done. Choose another host "
+                                         "type for this printer.");
                 show_error(this, text);
                 return;
             }
@@ -560,7 +563,7 @@ void PhysicalPrinterDialog::update_preset_input() {
     const std::string unusable_suffix = PresetCollection::get_suffix_modified(); //"(modified)";
     for (size_t i = 0; i < std::strlen(unusable_symbols); i++) {
         if (m_preset_name.find_first_of(unusable_symbols[i]) != std::string::npos) {
-            info_line    = _L("Name is invalid;") + "\n" + _L("illegal characters:") + " " + unusable_symbols;
+            info_line    = _L("This name can't be used:") + "\n" + _L("it contains characters that are not allowed in file names:") + " " + unusable_symbols;
             m_valid_type = NoValid;
             break;
         }
@@ -568,7 +571,7 @@ void PhysicalPrinterDialog::update_preset_input() {
 
 
     if (m_valid_type == Valid && m_preset_name.find(unusable_suffix) != std::string::npos) {
-        info_line    = _L("Name is invalid;") + "\n" + _L("illegal suffix:") + "\n\t" + from_u8(PresetCollection::get_suffix_modified());
+        info_line    = _L("This name can't be used:") + "\n" + _L("it ends with the mark the app adds to modified presets:") + "\n\t" + from_u8(PresetCollection::get_suffix_modified());
         m_valid_type = NoValid;
     }
 
@@ -580,7 +583,8 @@ void PhysicalPrinterDialog::update_preset_input() {
 
     const Preset *existing = m_presets->find_preset(m_preset_name, false);
     if (m_valid_type == Valid && existing && (existing->is_default || existing->is_system)) {
-        info_line = _L("Overwriting a system profile is not allowed.");
+        info_line = _L("A built-in system preset already has this name, and system presets can't be replaced. Choose "
+                       "another name.");
         m_valid_type = NoValid;
     }
 
@@ -589,27 +593,28 @@ void PhysicalPrinterDialog::update_preset_input() {
             info_line = from_u8((boost::format(_u8L("Preset \"%1%\" already exists.")) % m_preset_name).str());
         else
             info_line = from_u8((boost::format(_u8L("Preset \"%1%\" already exists and is incompatible with the current printer.")) % m_preset_name).str());
-        info_line += "\n" + _L("Please note that saving will overwrite the current preset.");
+        info_line += "\n" + _L("Saving will replace that preset with this one.");
         m_valid_type = Warning;
     }
 
     if (m_valid_type == Valid && m_preset_name.empty()) {
-        info_line    = _L("The name field is not allowed to be empty.");
+        info_line    = _L("Enter a name for the printer.");
         m_valid_type = NoValid;
     }
 
     if (m_valid_type == Valid && m_preset_name.find_first_of(' ') == 0) {
-        info_line    = _L("The name is not allowed to start with a space.");
+        info_line    = _L("The name can't start with a space. Remove the space at the start.");
         m_valid_type = NoValid;
     }
 
     if (m_valid_type == Valid && m_preset_name.find_last_of(' ') == m_preset_name.length() - 1) {
-        info_line    = _L("The name is not allowed to end with a space.");
+        info_line    = _L("The name can't end with a space. Remove the space at the end.");
         m_valid_type = NoValid;
     }
 
     if (m_valid_type == Valid && m_presets->get_preset_name_by_alias(m_preset_name) != m_preset_name) {
-        info_line    = _L("The name cannot be the same as a preset alias name.");
+        info_line    = _L("Another printer preset is already shown under this name. Choose a different name so the "
+                          "two can be told apart.");
         m_valid_type = NoValid;
     }
 
@@ -832,7 +837,8 @@ void PhysicalPrinterDialog::update_printers()
             printers.clear();
     } catch (const HostNetworkError &err) {
         printers.clear();
-        show_error(this, _L("Connection to printers connected via the print host failed.") + "\n\n" + from_u8(err.what()));
+        show_error(this, _L("The list of printers could not be read from the print host. Check that the print host "
+                            "is running and reachable from this Mac, then click Refresh again.") + "\n\n" + from_u8(err.what()));
     }
     Choice *choice = dynamic_cast<Choice*>(rs);
     choice->set_values(printers);

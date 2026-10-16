@@ -500,13 +500,13 @@ void SideTools::show_status(int status)
             m_hyperlink->SetLabel(_L("Failed to connect to the server"));
             update_connect_err_info(BAMBU_NETWORK_ERR_CONNECTION_TO_SERVER_FAILED,
                 _L("Failed to connect to cloud service"),
-                _L("Please click on the hyperlink above to view the cloud service status"));
+                _L("Check that this Mac is connected to the internet, then try again. If it is, the cloud service may be down for a while."));
         }
         else {
             m_hyperlink->SetLabel(_L("Failed to connect to the printer"));
             update_connect_err_info(BAMBU_NETWORK_ERR_CONNECTION_TO_PRINTER_FAILED,
                 _L("Connection to printer failed"),
-                _L("Please check the network connection of the printer and Snapmaker Orca."));
+                _L("Check that the printer is on and connected to the same network as this Mac, and allow this app under System Settings > Privacy & Security > Local Network."));
         }
 
         m_hyperlink->Show();

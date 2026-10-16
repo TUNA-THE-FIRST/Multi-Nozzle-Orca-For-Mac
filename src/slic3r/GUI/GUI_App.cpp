@@ -733,6 +733,88 @@ bool static check_old_linux_datadir(const wxString& app_name) {
 }
 #endif
 
+#ifdef __APPLE__
+// Snapmaker Orca Mac, first launch: offer to copy official Snapmaker Orca's settings into this app's own
+// settings folder. Copies, never moves, so official Snapmaker Orca keeps working as before.
+void GUI_App::offer_settings_import()
+{
+    namespace fs = boost::filesystem;
+    const std::string source = std::move(m_settings_import_source);
+    if (source.empty())
+        return;
+
+    wxMessageDialog ask(nullptr,
+        wxString::Format(_L("%s keeps its settings separately from Snapmaker Orca, so the two apps never overwrite each other's printers and presets.\n\n"
+                            "Do you want to copy your printers, filaments, process presets and preferences from Snapmaker Orca?\n\n"
+                            "They are copied from:\n%s\n\nSnapmaker Orca itself is not changed."),
+                         SLIC3R_MAC_APP_NAME, from_u8(source)),
+        _L("Import settings from Snapmaker Orca"), wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION);
+    ask.SetYesNoLabels(_L("Copy my settings"), _L("Start fresh"));
+    if (ask.ShowModal() != wxID_YES)
+        return;
+
+    // Logs, caches, crash databases, instance locks and queued log uploads belong to the other app's own runs.
+    static const std::set<std::string> skipped = { "log", "cache", "SentryData", "tmp", "log_upload_spool" };
+    const fs::path    target(data_dir());
+    const std::string conf_name = SLIC3R_APP_KEY ".conf";
+    // Copies `from` into `to` and keeps every file already there: nothing of this app is overwritten.
+    std::function<void(const fs::path &, const fs::path &)> copy_tree = [&copy_tree](const fs::path &from, const fs::path &to) {
+        fs::create_directories(to);
+        for (const fs::directory_entry &entry : fs::directory_iterator(from)) {
+            const fs::path to_path = to / entry.path().filename();
+            if (fs::is_symlink(entry.symlink_status()))
+                continue; // points into the other app's folder
+            if (fs::is_directory(entry.status()))
+                copy_tree(entry.path(), to_path);
+            else if (!fs::exists(to_path))
+                fs::copy_file(entry.path(), to_path);
+        }
+    };
+    std::string failure;
+    try {
+        for (const fs::directory_entry &entry : fs::directory_iterator(source)) {
+            const std::string name = entry.path().filename().string();
+            if (skipped.count(name) || boost::ends_with(name, ".lock") || name == conf_name || fs::is_symlink(entry.symlink_status()))
+                continue;
+            if (fs::is_directory(entry.status()))
+                copy_tree(entry.path(), target / name);
+            else if (!fs::exists(target / name))
+                fs::copy_file(entry.path(), target / name);
+        }
+        // The preferences last, and only after everything else: they name the presets copied above.
+        if (!fs::exists(target / conf_name))
+            fs::copy_file(fs::path(source) / conf_name, target / conf_name);
+    } catch (const std::exception &ex) {
+        failure = ex.what();
+    }
+
+    if (!failure.empty()) {
+        BOOST_LOG_TRIVIAL(error) << "Importing settings from " << source << " failed: " << failure;
+        wxMessageDialog(nullptr,
+            wxString::Format(_L("Some settings could not be copied from Snapmaker Orca.\n\n"
+                                "What failed: %s\n\n"
+                                "Why this can happen: macOS denied access to the folder, the disk is full, or Snapmaker Orca was "
+                                "changing its files while they were copied.\n\n"
+                                "How to fix it: quit Snapmaker Orca, then in Finder copy the contents of\n%s\ninto\n%s\n"
+                                "while %s is closed. Settings copied so far are kept; your preferences are copied only "
+                                "when everything else was."),
+                             from_u8(failure), from_u8(source), from_u8(target.string()), SLIC3R_MAC_APP_NAME),
+            _L("Import settings from Snapmaker Orca"), wxOK | wxICON_WARNING).ShowModal();
+    }
+
+    // The constructor read the empty preferences of a first launch; read the imported ones instead.
+    app_config->reset();
+    if (app_config->exists()) {
+        m_app_conf_exists = true;
+        m_config_corrupted = !app_config->load().empty();
+        m_last_config_version = app_config->orig_version();
+    }
+    apply_app_config_settings();
+    m_shortcuts->load(*app_config);
+    init_download_path();
+}
+#endif
+
 struct FileWildcards {
     const char*                 title_id;
     std::vector<std::string_view> file_extensions;
@@ -1028,8 +1110,11 @@ static void generic_exception_handle()
      } catch (const boost::io::bad_format_string& ex) {
      	BOOST_LOG_TRIVIAL(error) << boost::format("Uncaught exception: %1%") % ex.what();
         	flush_logs();
-        wxString errmsg = _L("Snapmaker Orca will terminate because of a localization error. "
-                             "It will be appreciated if you report the specific scenario this issue happened.");
+        wxString errmsg = _L("Snapmaker Orca has to close: a translated message has a formatting mistake.\n\n"
+                             "Why this can happen: a translation of the current language does not match the message it "
+                             "translates.\n"
+                             "How to fix it: switch the language to English in Preferences, reopen the app and repeat what "
+                             "you did; please report what you were doing when it happened.");
         wxMessageBox(errmsg + "\n\n" + wxString(ex.what()), _L("Critical error"), wxOK | wxICON_ERROR);
         std::terminate();
         //throw;
@@ -2560,7 +2645,12 @@ void GUI_App::init_networking_callbacks()
                                     text = wxString::Format(_L("Incorrect password"));
                                     wxGetApp().show_dialog(text);
                                 } else {
-                                text = wxString::Format(_L("Connect %s failed! [SN:%s, code=%s]"), from_u8(obj->get_dev_name()), obj->get_dev_id(), msg);
+                                text = wxString::Format(_L("Could not connect to the printer %s (serial number %s, error code %s).\n\n"
+                                                           "Why this can happen: the printer is off, asleep or on another Wi-Fi "
+                                                           "network than this Mac, or its access code changed.\n"
+                                                           "How to fix it: check that the printer is on and connected to the same "
+                                                           "network, check the access code on the printer's screen, and connect again."),
+                                                        from_u8(obj->get_dev_name()), obj->get_dev_id(), msg);
                                     wxGetApp().show_dialog(text);
                                 }
                                 event.SetInt(-1);
@@ -2865,7 +2955,14 @@ void GUI_App::init_webview_runtime()
 void GUI_App::init_app_config()
 {
 	// Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
+#ifdef __APPLE__
+    // Snapmaker Orca Mac keeps its settings apart from official Snapmaker Orca, so the two can be installed
+    // side by side without overwriting each other's presets. The app name also titles the macOS app menu.
+    SetAppName(SLIC3R_DATA_DIR_NAME);
+    SetAppDisplayName(SLIC3R_MAC_APP_NAME);
+#else
     SetAppName(SLIC3R_APP_KEY);
+#endif
 //	SetAppName(SLIC3R_APP_KEY "-alpha");
 //  SetAppName(SLIC3R_APP_KEY "-beta");
 //	SetAppDisplayName(SLIC3R_APP_NAME);
@@ -2898,6 +2995,18 @@ void GUI_App::init_app_config()
                 //BBS create folder if not exists
                 data_dir_path = boost::filesystem::path(data_dir);
                 set_data_dir(data_dir);
+            #ifdef __APPLE__
+                // A first launch finds no settings folder of its own; remember official Snapmaker Orca's,
+                // which on_init_inner() offers to copy once a dialog can be shown. Only then: a folder
+                // without preferences (deleted to reset them) still holds this app's own presets.
+                {
+                    boost::system::error_code ec;
+                    const boost::filesystem::path official = data_dir_path.parent_path() / SLIC3R_APP_KEY;
+                    if (official != data_dir_path && !boost::filesystem::exists(data_dir_path, ec) &&
+                        boost::filesystem::exists(official / (SLIC3R_APP_KEY ".conf"), ec))
+                        m_settings_import_source = official.string();
+                }
+            #endif
             #else
                 // Since version 2.3, config dir on Linux is in ${XDG_CONFIG_HOME}.
                 // https://github.com/prusa3d/PrusaSlicer/issues/2911
@@ -2972,13 +3081,17 @@ void GUI_App::init_app_config()
         }
 #endif // _WIN32
     }
+    apply_app_config_settings();
+}
+
+void GUI_App::apply_app_config_settings()
+{
     MixedFilamentManager::set_auto_generate_enabled(app_config->get_bool("auto_generate_gradients"));
     // Speed Dial opens on a bare Space from any page by default. Seed the flag so Preferences and the
     // MainFrame shortcut read the same value; an existing config (true or false) is left untouched.
     if (app_config->get("enable_speed_dial").empty())
         app_config->set_bool("enable_speed_dial", true);
     set_logging_level(Slic3r::level_string_to_boost(app_config->get("log_severity_level")));
-
 }
 
 // returns true if found newer version and user agreed to use it
@@ -3052,15 +3165,19 @@ void GUI_App::do_notify_flutter_web_copy_failure()
     switch (m_flutter_web_copy_status) {
     case FlutterWebCopyStatus::InstallFailed:
         show_error(mainframe,
-                   _L("Failed to install Web UI resources. Some features may not work correctly.\n"
-                      "Please check disk space and file permissions, then restart the application."));
+                   _L("The app could not install the files for its built-in web pages (Home, the Device tab, the setup "
+                      "wizard), so these may stay blank.\n\n"
+                      "Why this can happen: the disk is full, or the app's settings folder is not writable.\n"
+                      "How to fix it: make room on the disk, check that you can write to the folder opened by Help > Show "
+                      "Configuration Folder, then quit and reopen the app."));
         break;
     case FlutterWebCopyStatus::UpgradeFailed:
         if (notification_manager()) {
             notification_manager()->push_notification(
                 NotificationType::CustomNotification,
                 NotificationManager::NotificationLevel::WarningNotificationLevel,
-                _u8L("Failed to update Web UI resources. The application will continue using the previous version."));
+                _u8L("The app's built-in web pages could not be updated, so the previous version is kept. Make room on the "
+                     "disk and reopen the app to try again."));
         }
         break;
     default: 
@@ -3462,6 +3579,9 @@ bool GUI_App::on_init_inner()
         std::cerr << "Quitting, user chose to move their data to new location." << std::endl;
         return false;
     }
+#endif
+#ifdef __APPLE__
+    offer_settings_import();
 #endif
 
     BOOST_LOG_TRIVIAL(info) << boost::format("gui mode, Current Snapmaker_Orca Version %1%")%Snapmaker_VERSION;
@@ -4046,8 +4166,12 @@ bool GUI_App::on_init_inner()
         m_config_corrupted = false;
         show_error(nullptr,
                    _u8L(
-                       "The Snapmaker Orca configuration file may be corrupted and cannot be parsed.\nSnapmaker Orca has attempted to recreate the "
-                       "configuration file.\nPlease note, application settings will be lost, but printer profiles will not be affected."));
+                       "The app's preferences file could not be read, so it was replaced with a new one: preferences such as "
+                       "the language, units and recent projects are reset. Your printer, filament and process presets are "
+                       "not affected.\n\n"
+                       "Why this can happen: the app or the Mac shut down while the file was being saved, or the file was "
+                       "edited by hand.\n"
+                       "How to fix it: set your preferences again in Preferences."));
     }
 
     do_notify_flutter_web_copy_failure();
@@ -5618,7 +5742,8 @@ void GUI_App::import_presets()
         preset_updater->import_system_profile();
     }
     else {
-        MessageDialog(nullptr, _L("import failed!")).ShowModal();
+        MessageDialog(nullptr, _L("The import could not start because the profile updater is not ready yet. Wait until "
+                                  "the app has finished starting and try again.")).ShowModal();
     }
 }
 
@@ -6334,7 +6459,8 @@ void GUI_App::request_project_download(std::string project_id)
 void GUI_App::request_open_project(std::string project_id)
 {
     if (plater()->is_background_process_slicing()) {
-        Slic3r::GUI::show_info(nullptr, _L("new or open project file is not allowed during the slicing process!"), _L("Open Project"));
+        Slic3r::GUI::show_info(nullptr, _L("A project cannot be created or opened while the plate is being sliced. Wait until "
+                                           "slicing finishes, or stop it, and try again."), _L("Open Project"));
         return;
     }
 
@@ -7336,7 +7462,11 @@ bool GUI_App::process_network_msg(std::string dev_id, std::string msg)
         else if (msg == "update_firmware_studio") {
             BOOST_LOG_TRIVIAL(info) << "process_network_msg, firmware internal error";
             if (!m_show_error_msgdlg) {
-                MessageDialog msg_dlg(nullptr, _L("Internal error. Please try upgrading the firmware and OrcaSlicer version. If the issue persists, contact support."), "", wxAPPLY | wxOK);
+                MessageDialog msg_dlg(nullptr, _L("The printer reported an internal error while talking to the app.\n\n"
+                                                  "Why this can happen: the printer firmware and the network plugin are of versions "
+                                                  "that do not work together.\n"
+                                                  "How to fix it: update the printer's firmware from its screen or the Device tab, "
+                                                  "update the network plugin, then reconnect."), "", wxAPPLY | wxOK);
                 m_show_error_msgdlg = true;
                 msg_dlg.ShowModal();
                 m_show_error_msgdlg = false;
@@ -7864,7 +7994,10 @@ bool GUI_App::maybe_migrate_user_presets_on_login()
     } catch (const std::exception& ex) {
         BOOST_LOG_TRIVIAL(error) << "Failed to migrate user presets: " << ex.what();
         wxString err_msg = wxString::Format(
-            _L("Failed to migrate user presets:\n%s"),
+            _L("Your own presets could not be moved to the new preset format.\nError: %s\n\n"
+               "Why this can happen: a preset file is damaged or not readable, or the disk is full.\n"
+               "How to fix it: make room on the disk and reopen the app. If it fails again, move the file named in the "
+               "error out of the user folder opened by Help > Show Configuration Folder, and reopen the app."),
             from_u8(ex.what()));
         show_error(nullptr, err_msg);
         return false;
@@ -8064,7 +8197,9 @@ void GUI_App::sync_preset(Preset* preset, bool force)
             dialog_notified = true;
             if (mainframe == nullptr)
                 return;
-            auto msg = _L("The number of user presets cached in the cloud has exceeded the upper limit, newly created user presets can only be used locally.");
+            auto msg = _L("Your account has reached the maximum number of presets the cloud keeps, so new presets "
+                          "are saved on this Mac only and don't sync. Delete presets you no longer need to make room "
+                          "in the cloud.");
             MessageDialog(mainframe, msg, _L("Sync user presets"), wxICON_WARNING | wxOK).ShowModal();
         });
         return; // this error not need hold, and should not hold
@@ -9148,13 +9283,14 @@ bool GUI_App::load_language(wxString language, bool initial)
 
     if (!wxLocale::IsAvailable(locale_language_info->Language)) {
     	// Loading the language dictionary failed.
-	    wxString message = wxString::Format(_L("Switching Snapmaker Orca to language %s failed."), requested_language_code);
+	    wxString message = wxString::Format(_L("Snapmaker Orca could not switch to the language %s because the system has no "
+	                                           "locale for it. Choose another language in Preferences."), requested_language_code);
 #if !defined(_WIN32) && !defined(__APPLE__)
         // likely some linux system
         message += _L("\nYou may need to reconfigure the missing locales, likely by running the \"locale-gen\" and \"dpkg-reconfigure locales\" commands.\n");
 #endif
         if (initial)
-        	message + "\n\nApplication will close.";
+        	message += "\n\n" + _L("The application will close.");
         wxMessageBox(message, _L("Snapmaker Orca - Switching language failed"), wxOK | wxICON_ERROR);
         if (initial)
 			std::exit(EXIT_FAILURE);
@@ -9434,7 +9570,8 @@ void GUI_App::open_plugins_dialog(size_t open_on_tab, const std::string& highlig
             m_plugins_dlg->Destroy();
             m_plugins_dlg = nullptr;
         }
-        wxMessageBox(wxString::Format(_L("Failed to open the Plugins dialog:\n%s"), from_u8(e.what())), _L("Plugins"),
+        wxMessageBox(wxString::Format(_L("The Plugins window could not be opened:\n"
+                                         "%s\nRestart the app and try again."), from_u8(e.what())), _L("Plugins"),
                      wxOK | wxICON_ERROR, mainframe);
     } catch (...) {
         BOOST_LOG_TRIVIAL(error) << "open_plugins_dialog failed with a non-standard exception";
@@ -9442,7 +9579,8 @@ void GUI_App::open_plugins_dialog(size_t open_on_tab, const std::string& highlig
             m_plugins_dlg->Destroy();
             m_plugins_dlg = nullptr;
         }
-        wxMessageBox(_L("Failed to open the Plugins dialog (unknown error)."), _L("Plugins"), wxOK | wxICON_ERROR, mainframe);
+        wxMessageBox(_L("The Plugins window could not be opened because of an unexpected error. Restart the app and "
+                        "try again."), _L("Plugins"), wxOK | wxICON_ERROR, mainframe);
     }
 }
 
@@ -9476,7 +9614,8 @@ void GUI_App::refresh_plugins()
                 plater->get_notification_manager()->push_notification(
                     NotificationType::CustomNotification,
                     NotificationManager::NotificationLevel::ErrorNotificationLevel,
-                    into_u8(wxString::Format(_L("Failed to refresh plugins: %s"), error)));
+                    into_u8(wxString::Format(_L("The plugin list could not be refreshed: %s. Check your internet "
+                                                "connection and try again."), error)));
         });
     }).detach();
 }
@@ -11228,7 +11367,8 @@ void GUI_App::start_download(std::string url)
     //lets always init so if the download dest folder was changed, new dest is used
     boost::filesystem::path dest_folder(app_config->get("download_path"));
     if (dest_folder.empty() || !boost::filesystem::is_directory(dest_folder)) {
-        std::string msg = _u8L("Could not start URL download. Destination folder is not set. Please choose destination folder in Configuration Wizard.");
+        std::string msg = _u8L("The download could not start because the downloads folder is not set or no longer exists.\n\n"
+                               "How to fix it: choose a downloads folder in Preferences > Downloads folder and open the link again.");
         BOOST_LOG_TRIVIAL(error) << msg;
         show_error(nullptr, msg);
         return;

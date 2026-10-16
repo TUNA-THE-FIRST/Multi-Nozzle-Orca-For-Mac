@@ -5,6 +5,7 @@
 #include "GUI_App.hpp"
 #include "DeviceManager.hpp"
 #include "MainFrame.hpp"
+#include "format.hpp"
 #include "DownloadManager.hpp"
 #include "Timelapse/TimelapseDownloadPopup.hpp"
 #include "nlohmann/json.hpp"
@@ -3145,10 +3146,15 @@ void SSWCP_MachineOption_Instance::sw_UploadFiletoMachine() {
                 .form_add_file("file", std::string(filepath.ToUTF8()), std::string(filename.ToUTF8()))
                 .on_error([self, filename](std::string body, std::string error, unsigned status) {
                     // Http thread: the instance is touched on the UI thread only.
-                    wxGetApp().CallAfter([self, filename]() {
+                    wxGetApp().CallAfter([self, filename, error]() {
                         self->handle_general_fail();
-                        MessageDialog msg_window(nullptr, " " + filename + _L(" upload failed") + "\n", _L("UpLoad Failed"),
-                                                 wxICON_QUESTION | wxOK);
+                        wxString text = format_wxstr(_L("\"%1%\" could not be uploaded to the printer."), filename) + "\n\n" +
+                                        _L("Why this can happen: the printer disconnected or went to sleep, its storage is full, or the "
+                                           "network dropped during the transfer.\nHow to fix it: check that the printer is on and "
+                                           "connected, free some space on it, and upload the file again.");
+                        if (!error.empty())
+                            text += "\n\n" + _L("Details:") + " " + wxString::FromUTF8(error);
+                        MessageDialog msg_window(nullptr, text, _L("Upload Failed"), wxICON_WARNING | wxOK);
                         msg_window.ShowModal();
                     });
                 })
@@ -3242,10 +3248,15 @@ void SSWCP_MachineOption_Instance::sw_DownloadMachineFile() {
             http_object
                 .on_error([self, filename](std::string body, std::string error, unsigned status) {
                     // Http thread: the instance is touched on the UI thread only.
-                    wxGetApp().CallAfter([self, filename]() {
+                    wxGetApp().CallAfter([self, filename, error]() {
                         self->handle_general_fail();
-                        MessageDialog msg_window(nullptr, " " + filename + _L(" download failed") + "\n", _L("DownLoad Failed"),
-                                                 wxICON_QUESTION | wxOK);
+                        wxString text = format_wxstr(_L("\"%1%\" could not be downloaded from the printer."), filename) + "\n\n" +
+                                        _L("Why this can happen: the printer disconnected or went to sleep, the file was deleted on "
+                                           "the printer, or the network dropped during the transfer.\nHow to fix it: check that the "
+                                           "printer is on and connected, refresh its file list, and download the file again.");
+                        if (!error.empty())
+                            text += "\n\n" + _L("Details:") + " " + wxString::FromUTF8(error);
+                        MessageDialog msg_window(nullptr, text, _L("Download Failed"), wxICON_WARNING | wxOK);
                         msg_window.ShowModal();
                     });
                 })
@@ -3638,8 +3649,10 @@ void SSWCP_MachineOption_Instance::sw_SetFilamentMappingComplete()
             }
 
         } else {
-            MessageDialog msg_window(nullptr, " " + _L("setting failed") + "\n", _L("Print Job Setting"),
-                                     wxICON_QUESTION | wxOK);
+            MessageDialog msg_window(nullptr,
+                                     _L("The print job settings could not be applied. The printer may have disconnected or be "
+                                        "busy with another job. Check that it is on, connected and idle, then send the print again."),
+                                     _L("Print Job Setting"), wxICON_WARNING | wxOK);
             msg_window.ShowModal();
         }
 
@@ -4630,8 +4643,12 @@ void SSWCP_SliceProject_Instance::sw_NewProject()
                     if (wxGetApp().get_tab(Preset::TYPE_PRINTER)->select_preset(preset_name)) {
                         wxGetApp().plater()->new_project();
                     } else {
-                        MessageDialog msg_window(nullptr, "The machine model has not been installed!", _L("Create Failed"),
-                                                 wxICON_QUESTION | wxOK);
+                        MessageDialog msg_window(nullptr,
+                                                 format_wxstr(_L("The printer preset \"%1%\" is not installed, so a project for it "
+                                                                 "can't be created. Add this printer with Help > Setup Wizard, then "
+                                                                 "try again."),
+                                                              from_u8(preset_name)),
+                                                 _L("Create Failed"), wxICON_WARNING | wxOK);
                         msg_window.ShowModal();
                     }
 
@@ -7565,8 +7582,14 @@ void SSWCP_MqttAgent_Instance::sw_mqtt_set_engine()
                                     json data = devices;
                                     wxGetApp().device_card_notify(data);
 
-                                    MessageDialog msg_window(nullptr, " " + _L("Connection has been disconnected and recovery attempt failed. Please reconnect.") + "\n", _L("Machine Disconnected"),
-                                                             wxICON_QUESTION | wxOK);
+                                    MessageDialog msg_window(nullptr,
+                                                             _L("The connection to the printer was lost, and reconnecting automatically "
+                                                                "failed.") + "\n\n" +
+                                                                 _L("Why this can happen: the printer was turned off or went to sleep, "
+                                                                    "its Wi-Fi dropped, or this Mac moved to another network.\nHow to "
+                                                                    "fix it: check that the printer is on and on the same network as "
+                                                                    "this Mac, then connect to it again on the Device tab."),
+                                                             _L("Machine Disconnected"), wxICON_WARNING | wxOK);
                                     msg_window.ShowModal();
 
                                     wxGetApp().set_connect_host(nullptr);

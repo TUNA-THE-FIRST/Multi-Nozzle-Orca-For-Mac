@@ -4,81 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Snapmaker_Orca is an open-source 3D slicer application forked from Bambu Studio, built using C++ with wxWidgets for the GUI and CMake as the build system. The project uses a modular architecture with separate libraries for core slicing functionality, GUI components, and platform-specific code.
+Snapmaker Orca Mac is a macOS-only (Apple Silicon) build of Snapmaker_Orca, an open-source 3D slicer forked from Bambu Studio by way of OrcaSlicer, built using C++ with wxWidgets for the GUI and CMake as the build system. Read AGENTS.md first: it has the Mac-only rules (app identity, no telemetry, keep upstream-mergeable C++, error message style).
 
 ## Build Commands
 
-### Building on Windows
 ```bash
-# Build everything
-build_release_vs2022.bat
+# Dependencies, once
+./build_release_macos.sh -d -x
 
-# Build with debug symbols
-build_release_vs2022.bat debug
+# The app (Ninja); Xcode project when -x is left out
+./build_release_macos.sh -s -x
 
-# Build only dependencies
-build_release_vs2022.bat deps
+# The app and the unit tests, which then run
+./build_release_macos.sh -s -x -T
 
-# Build only slicer (after deps are built)
-build_release_vs2022.bat slicer
-
-
-```
-
-### Building on macOS
-```bash
-# Build everything (dependencies and slicer)
-./build_release_macos.sh
-
-# Build only dependencies
-./build_release_macos.sh -d
-
-# Build only slicer (after deps are built)
-./build_release_macos.sh -s
-
-# Use Ninja generator for faster builds
-./build_release_macos.sh -x
-
-# Build for specific architecture
-./build_release_macos.sh -a arm64    # or x86_64 or universal
-
-# Build for specific macOS version target
-./build_release_macos.sh -t 11.3
-```
-
-### Building on Linux
-```bash
-# First time setup - install system dependencies
-./build_linux.sh -u
-
-# Build dependencies and slicer
-./build_linux.sh -dsi
-
-# Build everything (alternative)
-./build_linux.sh -dsi
-
-# Individual options:
-./build_linux.sh -d    # dependencies only
-./build_linux.sh -s    # slicer only  
-./build_linux.sh -i    # build AppImage
-
-# Performance and debug options:
-./build_linux.sh -j N  # limit to N cores
-./build_linux.sh -1    # single core build
-./build_linux.sh -b    # debug build
-./build_linux.sh -c    # clean build
-./build_linux.sh -r    # skip RAM/disk checks
-./build_linux.sh -l    # use Clang instead of GCC
+# Sign and pack a DMG
+./scripts/package_macos.sh "build/arm64/Snapmaker_Orca/Snapmaker Orca Mac.app" Snapmaker_Orca_Mac.dmg
 ```
 
 ### Build System
-- Uses CMake with minimum version 3.13 (maximum 3.31.x on Windows)
+- Uses CMake with minimum version 3.13
 - Primary build directory: `build/`
 - Dependencies are built in `deps/build/`
 - The build process is split into dependency building and main application building
-- Windows builds use Visual Studio generators
 - macOS builds use Xcode by default, Ninja with -x flag
-- Linux builds use Ninja generator
 
 ### Testing
 Tests are located in the `tests/` directory and use the Catch2 testing framework. Test structure:
@@ -170,18 +119,18 @@ Run individual test suites:
 ### Internationalization and Localization  
 - `localization/i18n/` - Source translation files (.pot, .po)
 - `resources/i18n/` - Runtime language resources
-- Translation managed via `scripts/run_gettext.sh` / `scripts/run_gettext.bat`
+- Translation managed via `scripts/run_gettext.sh`
 
 ### Platform-Specific Code
 - `src/libslic3r/Platform.cpp` - Platform abstractions and utilities
 - `src/libslic3r/MacUtils.mm` - macOS-specific utilities (Objective-C++)
-- Windows-specific build scripts and configurations
-- Linux distribution support scripts in `scripts/linux.d/`
+- `src/slic3r/Utils/MacDarkMode.mm`, `src/slic3r/GUI/*Mac.mm` - AppKit glue (dark mode, gestures, instance check, deep links)
+- `cmake/modules/MacOSXBundleInfo.plist.in` - the app's Info.plist
 
 ### Build and Development Tools
 - `cmake/modules/` - Custom CMake find modules and utilities
 - `scripts/` - Python utilities for profile generation and validation  
-- `tools/` - Windows build tools (gettext utilities)
+- `scripts/package_macos.sh` - signs the app bundle and packs the DMG
 - `deps/` - External dependency build configurations
 
 ## Development Workflow
@@ -226,7 +175,6 @@ Run individual test suites:
 ### Dependencies and Build System
 - **CMake-based** with separate dependency building phase
 - **Dependencies** built once in `deps/build/`, then linked to main application  
-- **Cross-platform** considerations important for all changes
 - **Resource files** embedded at build time, platform-specific handling
 
 ### Performance Considerations
@@ -246,7 +194,7 @@ Run individual test suites:
 
 ### Compatibility and Stability
 - **Backward compatibility** maintained for project files and profiles
-- **Cross-platform** support essential (Windows/macOS/Linux)  
+- **macOS only**: Apple Silicon; keep shared C++ upstream-mergeable (see AGENTS.md)
 - **File format** changes require careful version handling
 - **Profile migrations** needed when settings change significantly
 
@@ -254,4 +202,4 @@ Run individual test suites:
 - **Regression testing** important due to algorithm complexity
 - **Performance benchmarks** help catch performance regressions
 - **Memory leak** detection important for long-running GUI application
-- **Cross-platform** testing required before releases
+- **Manual Mac testing** with docs/mac/TESTING.md before releases

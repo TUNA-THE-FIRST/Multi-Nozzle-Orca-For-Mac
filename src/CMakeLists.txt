@@ -129,12 +129,12 @@ if(ORCA_TOOLS)
         add_executable(Snapmaker_Orca_profile_validator MACOSX_BUNDLE dev-utils/Snapmaker_Orca_profile_validator.cpp)
         set_target_properties(Snapmaker_Orca_profile_validator PROPERTIES
             MACOSX_BUNDLE TRUE
-            MACOSX_BUNDLE_BUNDLE_NAME "Snapmaker_Orca Profile Validator"
+            MACOSX_BUNDLE_BUNDLE_NAME "${SLIC3R_MAC_APP_NAME} Profile Validator"
             MACOSX_BUNDLE_BUNDLE_VERSION "${SLIC3R_VERSION}"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "${SLIC3R_VERSION}"
-            MACOSX_BUNDLE_IDENTIFIER "com.Snapmaker.Snapmaker_Orca.profile-validator"
+            MACOSX_BUNDLE_IDENTIFIER "${SLIC3R_MAC_BUNDLE_ID}.profile-validator"
             MACOSX_BUNDLE_COPYRIGHT "Copyright © 2024-2026 Snapmaker. All rights reserved."
-            MACOSX_BUNDLE_GUI_IDENTIFIER "com.Snapmaker.Snapmaker_Orca.profile-validator"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "${SLIC3R_MAC_BUNDLE_ID}.profile-validator"
         )
     else()
         add_executable(Snapmaker_Orca_profile_validator dev-utils/Snapmaker_Orca_profile_validator.cpp)
@@ -407,7 +407,8 @@ else ()
         set(MACOSX_BUNDLE_ICON_FILE Icon.icns)
         set_target_properties(Snapmaker_Orca PROPERTIES
             MACOSX_BUNDLE TRUE
-            MACOSX_BUNDLE_BUNDLE_NAME "Snapmaker Orca"
+            MACOSX_BUNDLE_BUNDLE_NAME "${SLIC3R_MAC_APP_NAME}"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "${SLIC3R_MAC_BUNDLE_ID}"
             MACOSX_BUNDLE_SHORT_VERSION_STRING ${Snapmaker_VERSION}
             MACOSX_BUNDLE_COPYRIGHT "Copyright © 2024-2026 Snapmaker. All rights reserved."
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/cmake/modules/MacOSXBundleInfo.plist.in")
@@ -421,7 +422,7 @@ else ()
             # Xcode's CodeSign phase fails on the bundled Python runtime's dotted
             # dirs (python3.12) under Contents/MacOS. Skip it for local dev builds
             # and let the linker ad-hoc sign; the shipped bundle is signed by the
-            # Ninja/CI packaging path (build_release_macos.sh, build_orca.yml).
+            # Ninja/CI packaging path (build_release_macos.sh, scripts/package_macos.sh).
             set_target_properties(Snapmaker_Orca PROPERTIES XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO)
         endif()
         # Create symlink for macOS bundle Resources directory

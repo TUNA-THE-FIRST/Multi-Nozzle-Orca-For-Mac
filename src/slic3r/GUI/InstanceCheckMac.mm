@@ -23,7 +23,10 @@
 {
 	[self bring_forward];
 	//pass message  
-	Slic3r::GUI::wxGetApp().other_instance_message_handler()->handle_message(std::string([msg.userInfo[@"data"] UTF8String]));
+	NSString *data = msg.userInfo[@"data"];
+	if (![data isKindOfClass:[NSString class]])
+		return;
+	Slic3r::GUI::wxGetApp().other_instance_message_handler()->handle_message(std::string([data UTF8String]));
 }
 
 -(void)closing_update:(NSNotification *)msg
@@ -51,20 +54,26 @@
 
 namespace Slic3r {
 
+// Messages carry file paths, so they travel as UTF-8: the legacy default C string encoding (Mac Roman)
+// garbled names with accents ("peça.3mf"), and the running instance could not find the file.
 void send_message_mac(const std::string &msg, const std::string &version)
 {
-	NSString *nsmsg = [NSString stringWithCString:msg.c_str() encoding:[NSString defaultCStringEncoding]];
+	NSString *nsmsg = [NSString stringWithUTF8String:msg.c_str()];
+	if (nsmsg == nil) // not valid UTF-8; a nil value would throw in dictionaryWithObject:
+		return;
 	//NSString *nsver = @"OtherSnapmaker_OrcaInstanceMessage" + [NSString stringWithCString:version.c_str() encoding:[NSString defaultCStringEncoding]];
-	NSString *nsver = [NSString stringWithCString:version.c_str() encoding:[NSString defaultCStringEncoding]];
+	NSString *nsver = [NSString stringWithUTF8String:version.c_str()];
 	NSString *notifname = [NSString stringWithFormat: @"%@%@", @"OtherSnapmaker_OrcaInstanceMessage", nsver];
 	[[NSDistributedNotificationCenter defaultCenter] postNotificationName:notifname object:nil userInfo:[NSDictionary dictionaryWithObject:nsmsg forKey:@"data"] deliverImmediately:YES];
 }
 
 void send_message_mac_closing(const std::string &msg, const std::string &version)
 {
-	NSString *nsmsg = [NSString stringWithCString:msg.c_str() encoding:[NSString defaultCStringEncoding]];
+	NSString *nsmsg = [NSString stringWithUTF8String:msg.c_str()];
+	if (nsmsg == nil)
+		return;
 	//NSString *nsver = @"OtherSnapmaker_OrcaInstanceMessage" + [NSString stringWithCString:version.c_str() encoding:[NSString defaultCStringEncoding]];
-	NSString *nsver = [NSString stringWithCString:version.c_str() encoding:[NSString defaultCStringEncoding]];
+	NSString *nsver = [NSString stringWithUTF8String:version.c_str()];
 	NSString *notifname = [NSString stringWithFormat: @"%@%@", @"OtherSnapmaker_OrcaInstanceClosing", nsver];
 	[[NSDistributedNotificationCenter defaultCenter] postNotificationName:notifname object:nil userInfo:[NSDictionary dictionaryWithObject:nsmsg forKey:@"data"] deliverImmediately:YES];
 }
@@ -74,7 +83,7 @@ void OtherInstanceMessageHandler::register_for_messages(const std::string &versi
 {
 	m_impl_osx = [[OtherInstanceMessageHandlerMac alloc] init];
 	if(m_impl_osx) {
-		NSString *nsver = [NSString stringWithCString:version_hash.c_str() encoding:[NSString defaultCStringEncoding]];
+		NSString *nsver = [NSString stringWithUTF8String:version_hash.c_str()];
 		[(id)m_impl_osx add_observer:nsver];
 	}
 }
@@ -83,6 +92,9 @@ void OtherInstanceMessageHandler::unregister_for_messages()
 {
 	//NSLog(@"unreegistering other instance messages");
 	if (m_impl_osx) {
+        // Stop deliveries before the observer goes away; a message from another instance arriving
+        // during shutdown would otherwise reach a released object.
+        [[NSDistributedNotificationCenter defaultCenter] removeObserver:(id)m_impl_osx];
         [(id)m_impl_osx release];
         m_impl_osx = nullptr;
     } else {

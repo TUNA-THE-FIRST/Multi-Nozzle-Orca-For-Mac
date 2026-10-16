@@ -32,25 +32,30 @@ wxString get_fail_reason(int code)
         return _L("Failed to connect socket");
 
     else if (code == BAMBU_NETWORK_ERR_BIND_PUBLISH_LOGIN_REQUEST)
-        return _L("Failed to publish login request");
+        return _L("The sign-in request could not be sent to the printer. Check that the printer is on and connected "
+                  "to the internet, and try again.");
 
     else if (code == BAMBU_NETWORK_ERR_BIND_GET_PRINTER_TICKET_TIMEOUT)
-        return _L("Timeout getting ticket from device");
+        return _L("The printer did not answer the sign-in in time. Check that it is on and connected to the "
+                  "internet, and try again.");
 
     else if (code == BAMBU_NETWORK_ERR_BIND_GET_CLOUD_TICKET_TIMEOUT)
-        return _L("Timeout getting ticket from server");
+        return _L("The Bambu server did not answer the sign-in in time. Check your internet connection and try again.");
 
     else if (code == BAMBU_NETWORK_ERR_BIND_POST_TICKET_TO_CLOUD_FAILED)
-        return _L("Failed to post ticket to server");
+        return _L("The sign-in could not be sent to the Bambu server. Check your internet connection and try again.");
 
     else if (code == BAMBU_NETWORK_ERR_BIND_PARSE_LOGIN_REPORT_FAILED)
-        return _L("Failed to parse login report reason");
+        return _L("The printer's answer to the sign-in could not be read. Update the printer's firmware and try "
+                  "again.");
 
     else if (code == BAMBU_NETWORK_ERR_BIND_ECODE_LOGIN_REPORT_FAILED)
-        return _L("Failed to parse login report reason");
+        return _L("The printer's answer to the sign-in could not be read. Update the printer's firmware and try "
+                  "again.");
 
     else if (code == BAMBU_NETWORK_ERR_BIND_RECEIVE_LOGIN_REPORT_TIMEOUT)
-        return _L("Receive login report timeout");
+        return _L("The printer did not confirm the sign-in in time. Check that it is on and connected to the "
+                  "internet, and try again.");
 
     else
         return _L("Unknown Failure");

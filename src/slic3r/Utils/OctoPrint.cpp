@@ -178,12 +178,16 @@ bool OctoPrint::test_with_resolved_ip(wxString &msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (!res) {
-                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : name));
+                    msg = GUI::format_wxstr(_L("The address answers, but the software there (%s) is not the host "
+                                               "type selected for this printer. Choose the host type that matches "
+                                               "the printer's software in the printer's connection settings."), (text ? *text : name));
                 }
             }
             catch (const std::exception&) {
                 res = false;
-                msg = _L("Could not parse server response.");
+                msg = _L("The printer's answer could not be read. The address may point to another device or web "
+                         "page than the printer's software, or the host type may not match it. Check the address and "
+                         "the host type in the printer's connection settings.");
             }
         })
         .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
@@ -227,12 +231,16 @@ bool OctoPrint::test(wxString& msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (! res) {
-                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : name));
+                    msg = GUI::format_wxstr(_L("The address answers, but the software there (%s) is not the host "
+                                               "type selected for this printer. Choose the host type that matches "
+                                               "the printer's software in the printer's connection settings."), (text ? *text : name));
                 }
             }
             catch (const std::exception &) {
                 res = false;
-                msg = _L("Could not parse server response.");
+                msg = _L("The printer's answer could not be read. The address may point to another device or web "
+                         "page than the printer's software, or the host type may not match it. Check the address and "
+                         "the host type in the printer's connection settings.");
             }
         })
 #ifdef WIN32
@@ -644,12 +652,16 @@ bool PrusaLink::test(wxString& msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (!res) {
-                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
+                    msg = GUI::format_wxstr(_L("The address answers, but the software there (%s) is not the host "
+                                               "type selected for this printer. Choose the host type that matches "
+                                               "the printer's software in the printer's connection settings."), (text ? *text : "OctoPrint"));
                 }
             }
             catch (const std::exception&) {
                 res = false;
-                msg = _L("Could not parse server response.");
+                msg = _L("The printer's answer could not be read. The address may point to another device or web "
+                         "page than the printer's software, or the host type may not match it. Check the address and "
+                         "the host type in the printer's connection settings.");
             }
         })
 #ifdef WIN32
@@ -764,7 +776,9 @@ bool PrusaLink::get_storage(wxArrayString& storage_path, wxArrayString& storage_
             }
         }
         // TRN %1% = host
-        std::string message = GUI::format(_L("Upload has failed. There is no suitable storage found at %1%."), m_host) + GUI::into_u8(error_msg);
+        std::string message = GUI::format(_L("The upload failed: the printer at %1% has no storage that can take the "
+                                             "file - every storage is read only or full. Free some space on the "
+                                             "printer (or insert its storage card) and try again."), m_host) + GUI::into_u8(error_msg);
         BOOST_LOG_TRIVIAL(error) << message;
         throw Slic3r::IOError(message);
     }
@@ -807,7 +821,9 @@ bool PrusaLink::test_with_method_check(wxString& msg, bool& use_put) const
             const auto text = ptree.get_optional<std::string>("text");
             res = validate_version_text(text);
             if (!res) {
-                msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
+                msg = GUI::format_wxstr(_L("The address answers, but the software there (%s) is not the host type "
+                                           "selected for this printer. Choose the host type that matches the "
+                                           "printer's software in the printer's connection settings."), (text ? *text : "OctoPrint"));
                 use_put = false;
                 return;
             }
@@ -825,7 +841,9 @@ bool PrusaLink::test_with_method_check(wxString& msg, bool& use_put) const
         }
         catch (const std::exception&) {
             res = false;
-            msg = _L("Could not parse server response.");
+            msg = _L("The printer's answer could not be read. The address may point to another device or web page "
+                     "than the printer's software, or the host type may not match it. Check the address and the host "
+                     "type in the printer's connection settings.");
         }
     })
 #ifdef WIN32
@@ -887,7 +905,9 @@ bool PrusaLink::test_with_resolved_ip_and_method_check(wxString& msg, bool& use_
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (!res) {
-                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
+                    msg = GUI::format_wxstr(_L("The address answers, but the software there (%s) is not the host "
+                                               "type selected for this printer. Choose the host type that matches "
+                                               "the printer's software in the printer's connection settings."), (text ? *text : "OctoPrint"));
                     use_put = false;
                     return;
                 }
@@ -905,7 +925,9 @@ bool PrusaLink::test_with_resolved_ip_and_method_check(wxString& msg, bool& use_
             }
             catch (const std::exception&) {
                 res = false;
-                msg = _L("Could not parse server response.");
+                msg = _L("The printer's answer could not be read. The address may point to another device or web "
+                         "page than the printer's software, or the host type may not match it. Check the address and "
+                         "the host type in the printer's connection settings.");
             }
 
         })

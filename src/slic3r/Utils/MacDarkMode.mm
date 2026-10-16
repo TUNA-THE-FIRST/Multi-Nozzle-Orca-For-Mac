@@ -39,8 +39,9 @@ double mac_max_scaling_factor()
     if ([NSScreen screens] == nil) {
         scaling = [[NSScreen mainScreen] backingScaleFactor];
     } else {
-	    for (int i = 0; i < [[NSScreen screens] count]; ++ i)
-	    	scaling = std::max<double>(scaling, [[[NSScreen screens] objectAtIndex:0] backingScaleFactor]);
+	    // Every screen counts: icons rendered for a 1x main screen look blurry on a Retina one.
+	    for (NSUInteger i = 0; i < [[NSScreen screens] count]; ++ i)
+	    	scaling = std::max<double>(scaling, [[[NSScreen screens] objectAtIndex:i] backingScaleFactor]);
 	}
     return scaling;
 }
@@ -163,8 +164,9 @@ void WKWebView_force_display(void * web)
 
 void openFolderForFile(wxString const & file)
 {
-    NSArray *fileURLs = [NSArray arrayWithObjects:wxCFStringRef(file).AsNSString(), /* ... */ nil];
-    [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs:fileURLs];
+    // Finder selects files given as file URLs; a plain path string is not one.
+    NSURL *url = [NSURL fileURLWithPath:wxCFStringRef(file).AsNSString()];
+    [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs:@[url]];
 }
     
 }

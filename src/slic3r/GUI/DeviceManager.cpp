@@ -1333,11 +1333,14 @@ bool MachineObject::canEnableTimelapse(wxString &error_message) const
 
     if (m_storage->get_sdcard_state() != DevStorage::SdcardState::HAS_SDCARD_NORMAL && !m_has_timelapse_kit) {
         if (m_storage->get_sdcard_state() == DevStorage::SdcardState::NO_SDCARD) {
-            error_message = _L("Timelapse is not supported while the storage does not exist.");
+            error_message = _L("A timelapse needs a storage card in the printer to save the video. Insert one, or "
+                               "turn timelapse off.");
         } else if (m_storage->get_sdcard_state() == DevStorage::SdcardState::HAS_SDCARD_ABNORMAL) {
-            error_message = _L("Timelapse is not supported while the storage is unavailable.");
+            error_message = _L("A timelapse needs the printer's storage card, which can't be used right now: it may "
+                               "be full or need formatting. Check it on the printer, or turn timelapse off.");
         } else if (m_storage->get_sdcard_state() == DevStorage::SdcardState::HAS_SDCARD_READONLY) {
-            error_message = _L("Timelapse is not supported while the storage is readonly.");
+            error_message = _L("A timelapse needs to save the video on the printer's storage card, which is "
+                               "read-only or write-protected. Replace or reformat the card, or turn timelapse off.");
         }
 
         return false;
@@ -4129,7 +4132,8 @@ int MachineObject::parse_json(std::string tunnel, std::string payload, bool key_
                     if (jj.contains("result")) {
                         result = jj["result"].get<std::string>();
                         if (result == "FAIL") {
-                            wxString text = _L("Failed to start print job");
+                            wxString text = _L("The print could not be started on the printer. Check that it is idle "
+                                               "and its storage card has room, then send the print again.");
                             GUI::wxGetApp().push_notification(this, text);
                         }
                     }
@@ -4267,7 +4271,9 @@ int MachineObject::parse_json(std::string tunnel, std::string payload, bool key_
                                 info = _L("Selected diameter and machine diameter do not match");
                             }
                             else if (reason == "generate auto filament cali gcode failure") {
-                                info = _L("Failed to generate cali G-code");
+                                info = _L("The calibration G-code could not be created, usually because of a printer "
+                                          "or filament setting the calibration doesn't support. Check the "
+                                          "calibration settings and try again.");
                             }
                             else {
                                 info = reason;

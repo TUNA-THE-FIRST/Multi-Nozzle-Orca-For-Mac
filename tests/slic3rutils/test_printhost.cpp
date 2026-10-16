@@ -19,6 +19,7 @@ class TestPrintHost : public PrintHost
 {
 public:
     using PrintHost::format_error;
+    using PrintHost::http_status_hint;
 
     const char* get_name() const override { return "Test"; }
     bool test(wxString&) const override { return true; }
@@ -66,9 +67,26 @@ struct UploadEvents
     }
 };
 
-std::string format_error(const std::string& body, const std::string& error, unsigned status)
+std::string full_error(const std::string& body, const std::string& error, unsigned status)
 {
     return TestPrintHost().format_error(body, error, status).ToStdString();
+}
+
+// The explanation format_error() adds after a known HTTP status, in a paragraph of its own.
+std::string hint_suffix(unsigned status)
+{
+    const std::string hint = TestPrintHost::http_status_hint(status).ToStdString();
+    return hint.empty() ? std::string() : "\n\n" + hint;
+}
+
+// The reason format_error() shows, without that explanation (tested on its own below).
+std::string format_error(const std::string& body, const std::string& error, unsigned status)
+{
+    std::string       msg    = full_error(body, error, status);
+    const std::string suffix = status != 0 ? hint_suffix(status) : std::string();
+    if (!suffix.empty() && msg.size() > suffix.size() && msg.compare(msg.size() - suffix.size(), suffix.size(), suffix) == 0)
+        msg.resize(msg.size() - suffix.size());
+    return msg;
 }
 
 std::string envelope(int code, const std::string& message, const std::string& traceback)
@@ -260,6 +278,44 @@ TEST_CASE("Error bodies that are not a Moonraker envelope are left unchanged", "
     {
         CHECK(format_error("", "curl:Could not connect", 0) == "curl:Could not connect");
     }
+}
+
+TEST_CASE("A known HTTP status without a reason of the printer's own says why it happens and what to do", "[PrintHost]")
+{
+    const unsigned status = GENERATE(400u, 401u, 403u, 404u, 409u, 413u, 415u, 500u, 502u, 503u, 504u);
+    REQUIRE_FALSE(TestPrintHost::http_status_hint(status).empty());
+    const std::string body = R"JSON({"error": "File not found"})JSON";
+    CHECK(full_error(body, "", status) == "HTTP " + std::to_string(status) + ": " + body + hint_suffix(status));
+
+    SECTION("a Moonraker error naming only the status")
+    {
+        const std::string bare = R"JSON({"error": {"code": 500, "message": "Internal Server Error", "traceback": ""}})JSON";
+        CHECK(full_error(bare, "", 500) == "HTTP 500: Internal Server Error" + hint_suffix(500));
+    }
+}
+
+TEST_CASE("A reason the printer gives is not followed by general advice for its status", "[PrintHost]")
+{
+    // A 403 for a file being printed is no sign of a wrong API key; restarting does not free a full disk.
+    CHECK(full_error(k_busy_file_403, "", 403) == "HTTP 403: Forbidden (File is loaded, upload not permitted)");
+    const std::string full_disk = envelope(500, "Internal Server Error", "Traceback (most recent call last):\nOSError: [Errno 28] No space left on device\n");
+    CHECK(full_error(full_disk, "", 500) == "HTTP 500: Internal Server Error (OSError: [Errno 28] No space left on device)");
+}
+
+TEST_CASE("A connection failure the app recognizes is explained", "[PrintHost]")
+{
+    const std::string timeout = full_error("", "curl:Timeout was reached:\nOperation timed out after 5000 milliseconds\n[Error 28]", 0);
+    CHECK_THAT(timeout, Catch::Matchers::StartsWith("The printer did not answer in time."));
+    CHECK_THAT(timeout, Catch::Matchers::ContainsSubstring("Local Network"));
+
+    const std::string refused = full_error("", "curl:Couldn't connect to server:\nFailed to connect to 192.168.1.20 port 80: Connection refused\n[Error 7]", 0);
+    CHECK_THAT(refused, Catch::Matchers::StartsWith("The printer could not be reached at this address."));
+}
+
+TEST_CASE("A message the caller wrote itself is shown unchanged", "[PrintHost]")
+{
+    const std::string message = GENERATE(as<std::string>{}, "Wrong password", "Unknown error occurred", "ElegooLink not detected");
+    CHECK(full_error("", message, 0) == message);
 }
 
 TEST_CASE("Print host error code is read from a JSON reply", "[PrintHost]")

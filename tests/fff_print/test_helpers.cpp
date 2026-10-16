@@ -230,8 +230,7 @@ DynamicPrintConfig multifilament_config(unsigned int filaments, std::initializer
 	return config;
 }
 
-void init_print(std::vector<TriangleMesh> &&meshes, Slic3r::Print &print, Slic3r::Model &model, const DynamicPrintConfig &config_in,
-                const std::vector<std::vector<ConfigBase::SetDeserializeItem>> *per_object_overrides, bool arrange)
+DynamicPrintConfig init_print_config(const DynamicPrintConfig &config_in)
 {
 	DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
     config.apply(config_in);
@@ -291,6 +290,13 @@ void init_print(std::vector<TriangleMesh> &&meshes, Slic3r::Print &print, Slic3r
             }
         }
     }
+    return config;
+}
+
+void init_print(std::vector<TriangleMesh> &&meshes, Slic3r::Print &print, Slic3r::Model &model, const DynamicPrintConfig &config_in,
+                const std::vector<std::vector<ConfigBase::SetDeserializeItem>> *per_object_overrides, bool arrange)
+{
+    const DynamicPrintConfig config = init_print_config(config_in);
 
     size_t object_idx = 0;
     for (const TriangleMesh &t : meshes) {

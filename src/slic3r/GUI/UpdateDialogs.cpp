@@ -241,7 +241,8 @@ void dismiss_modal_msg_update_config_with_cancel()
 //MsgUpdateForced
 
 MsgUpdateForced::MsgUpdateForced(const std::vector<Update>& updates) :
-    MsgDialog(nullptr, _(L("Configuration incompatible")), _(L("the configuration package is incompatible with the current application.")) + " ", wxOK | wxICON_ERROR)
+    MsgDialog(nullptr, _(L("Configuration incompatible")), _(L("the installed profiles don't match this version of "
+                                                               "the app.")) + " ", wxOK | wxICON_ERROR)
 {
 	auto* text = new wxStaticText(this, wxID_ANY, wxString::Format(_(L(
 		"The configuration package is incompatible with the current application.\n"
@@ -306,7 +307,8 @@ MsgUpdateForced::~MsgUpdateForced() {}
 // MsgDataIncompatible
 
 MsgDataIncompatible::MsgDataIncompatible(const std::unordered_map<std::string, wxString> &incompats) :
-    MsgDialog(nullptr,  _(L("Configuration incompatible")), _(L("the configuration package is incompatible with the current application.")), wxICON_ERROR)
+    MsgDialog(nullptr,  _(L("Configuration incompatible")), _(L("the installed profiles don't match this version of "
+                                                                "the app.")), wxICON_ERROR)
 {
     //TODO
 	//auto *text = new wxStaticText(this, wxID_ANY, wxString::Format(_(L(

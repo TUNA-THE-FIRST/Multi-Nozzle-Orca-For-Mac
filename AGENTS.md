@@ -1,23 +1,20 @@
 # AGENTS.md
 
-Snapmaker Orca — open-source C++17 3D slicer, forked from OrcaSlicer. wxWidgets GUI, CMake build system.
+Snapmaker Orca Mac — a macOS-only (Apple Silicon) build of Snapmaker Orca, the open-source C++17 3D slicer forked
+from OrcaSlicer. wxWidgets GUI, CMake build system.
 
 ## Build Commands
 
 ```bash
-# macOS
-cmake --build build/arm64 --config RelWithDebInfo --target all --
-
-# Linux
-cmake --build build --config RelWithDebInfo --target all --
-
-# Windows (replace %build_type% with Debug/Release/RelWithDebInfo)
-cmake --build . --config %build_type% --target ALL_BUILD -- -m
+./build_release_macos.sh -d -x      # dependencies, once
+./build_release_macos.sh -s -x      # the app: build/arm64/Snapmaker_Orca/Snapmaker Orca Mac.app
+./build_release_macos.sh -s -x -T   # the app and the unit tests, then runs them
+cmake --build build/arm64 --config Release --target all   # rebuild an already configured tree
+./scripts/package_macos.sh "build/arm64/Snapmaker_Orca/Snapmaker Orca Mac.app" out.dmg   # sign + DMG
 ```
 
-The platform wrappers drive the same flow with the toolchain flags this project needs, and are what
-CI runs: `./build_release_macos.sh -s` (`-x` Ninja, `-a arm64|x86_64|universal`, `-d` deps only),
-`./build_linux.sh -dsi`, `build_win.bat -ds`.
+CI is `.github/workflows/build_macos.yml` (macos-26 runners): app, unit tests, profile slice check, DMG artifact.
+Testing a build by hand: [docs/mac/TESTING.md](docs/mac/TESTING.md).
 
 ## Testing
 
@@ -61,7 +58,15 @@ ctest --test-dir ./tests/fff_print -C Release
 ## Critical Constraints
 
 - **Backward compatibility required** for .3mf project files and printer profiles
-- **Cross-platform** — all changes must work on Windows, macOS, and Linux
+- **macOS only** — this fork ships for Apple Silicon Macs and nothing else; Windows/Linux packaging and CI are gone.
+  The shared C++ keeps its Windows/Linux branches untouched so upstream fixes (LixNix's Snapmaker Orca, OrcaSlicer)
+  keep merging cleanly: don't strip `#ifdef _WIN32` / `__linux__` code, and keep Mac fixes inside Mac paths or
+  platform-neutral.
+- **App identity** — the Mac bundle is "Snapmaker Orca Mac" (`SLIC3R_MAC_APP_NAME`, `SLIC3R_MAC_BUNDLE_ID`,
+  `SLIC3R_DATA_DIR_NAME` in `version.inc`). `SLIC3R_APP_NAME`/`SLIC3R_APP_KEY` stay "Snapmaker Orca"/"Snapmaker_Orca":
+  G-code headers, 3MF metadata and the HTTP user agent carry them, and printers and Snapmaker's services read them.
+- **No telemetry** — Sentry and SnapLog are off on macOS; don't add anything that reports to Snapmaker or elsewhere.
+- **Error messages** — a user-facing error says what happened, why it likely happened, and how to fix it.
 - Profile/format changes need version migration handling
 - Dependencies built separately in `deps/build/`, then linked to main app
 - **The product is Snapmaker Orca** — never introduce "OrcaSlicer" or "Orca Slicer" into a user-facing string owned by this fork. The app key is `Snapmaker_Orca` (`version.inc`); naming upstream OrcaSlicer in developer docs, comments or dependency names is fine
@@ -105,7 +110,7 @@ See the [Localization guide](https://github.com/OrcaSlicer/OrcaSlicer_WIKI/blob/
 
 ### Verifying
 
-- `scripts/run_gettext.bat --full` (Windows) or `scripts/run_gettext.sh` (macOS/Linux) regenerates the template, merges every catalog and compiles the `.mo` files. It must exit 0.
+- `scripts/run_gettext.sh` regenerates the template, merges every catalog and compiles the `.mo` files. It must exit 0.
 - Or check a single catalog with `msgfmt --check-format -o <out>.mo localization/i18n/<lang>/Snapmaker_Orca_<lang>.po`.
 - Fuzzy entries are not shown to users. If you correct one, clear its `fuzzy` flag, otherwise the fix never ships.
 

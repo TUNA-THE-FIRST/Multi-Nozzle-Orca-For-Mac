@@ -4870,7 +4870,7 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Extruders");
     def->tooltip = L("Filament to print internal sparse infill.\n\"Default\" uses the active object/part filament.");
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comSimple; // Snapmaker Orca Mac: shown in Simple mode on multi-nozzle printers (TabPrint::toggle_options)
     def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("sparse_infill_line_width", coFloatsOrPercents);
@@ -5833,7 +5833,7 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Extruders");
     def->tooltip = L("Filament to print outer walls.\n\"Default\" uses the active object/part filament.");
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comSimple; // Snapmaker Orca Mac: shown in Simple mode on multi-nozzle printers (TabPrint::toggle_options)
     def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("inner_wall_filament_id", coInt);
@@ -5842,7 +5842,7 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Extruders");
     def->tooltip = L("Filament to print inner walls.\n\"Default\" uses the active object/part filament.");
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comSimple; // Snapmaker Orca Mac: shown in Simple mode on multi-nozzle printers (TabPrint::toggle_options)
     def->set_default_value(new ConfigOptionInt(0));
 
     // ORCA: split wall layer heights. When the outer and inner wall filaments print at their own
@@ -7046,7 +7046,7 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Extruders");
     def->tooltip = L("Filament to print internal solid infill.\n\"Default\" uses the active object/part filament.");
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comSimple; // Snapmaker Orca Mac: shown in Simple mode on multi-nozzle printers (TabPrint::toggle_options)
     def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("top_surface_filament_id", coInt);
@@ -7055,7 +7055,7 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Extruders");
     def->tooltip = L("Filament to print top surface.\n\"Default\" uses the active object/part filament.");
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comSimple; // Snapmaker Orca Mac: shown in Simple mode on multi-nozzle printers (TabPrint::toggle_options)
     def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("bottom_surface_filament_id", coInt);
@@ -7064,7 +7064,7 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Extruders");
     def->tooltip = L("Filament to print bottom surface.\n\"Default\" uses the active object/part filament.");
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comSimple; // Snapmaker Orca Mac: shown in Simple mode on multi-nozzle printers (TabPrint::toggle_options)
     def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("internal_solid_infill_line_width", coFloatsOrPercents);
@@ -10648,10 +10648,12 @@ void DynamicPrintConfig::normalize_fdm(int used_filaments)
         }
     }
 
-    if (this->has("wipe_tower_filament")) {
+    // A process preset loaded on its own (the command line normalizes each settings file it loads) has
+    // no nozzle_diameter to check the filament against.
+    if (const auto *nozzles = this->opt<ConfigOptionFloats>("nozzle_diameter"); this->has("wipe_tower_filament") && nozzles != nullptr) {
         // If invalid, replace with 0.
         int extruder      = this->opt<ConfigOptionInt>("wipe_tower_filament")->value;
-        int num_extruders = this->opt<ConfigOptionFloats>("nozzle_diameter")->size();
+        int num_extruders = nozzles->size();
         if (extruder < 0 || extruder > num_extruders)
             this->option("wipe_tower_filament")->setInt(0);
     }

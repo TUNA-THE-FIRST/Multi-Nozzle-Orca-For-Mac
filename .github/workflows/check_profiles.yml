@@ -76,7 +76,7 @@ jobs:
             echo "have_validator=true" >> "${GITHUB_OUTPUT}"
           else
             echo "have_validator=false" >> "${GITHUB_OUTPUT}"
-            echo "::notice::No profile validator at ${url} - the C++ validator checks are skipped. Publish a nightly build of this repository to enable them."
+            echo "::notice::No profile validator at ${url} - the C++ validator checks are skipped here. The Build macOS workflow's Profile slice check runs them with the validator it builds."
           fi
 
       # Validate all system profiles.
@@ -274,7 +274,7 @@ jobs:
             fi
 
             echo "---"
-            echo '*Fix the errors above and push a new commit. To reproduce this run locally: `scripts/check_profile.sh`, or `scripts\check_profile.bat` on Windows.*'
+            echo '*Fix the errors above and push a new commit. To reproduce this run locally: `scripts/check_profile.sh`.*'
           } > ${{ runner.temp }}/profile-check-results/pr_comment.md
 
       - name: Upload comment artifact
@@ -289,5 +289,5 @@ jobs:
         if: ${{ always() && (steps.profile_tool.outcome == 'failure' || steps.validate_system.outcome == 'failure' || steps.validate_slice.outcome == 'failure' || steps.validate_filament_subtypes.outcome == 'failure' || steps.validate_custom.outcome == 'failure') }}
         run: |
           echo "One or more profile checks failed; see the step logs above."
-          echo 'Reproduce the whole run locally with scripts/check_profile.sh (scripts\check_profile.bat on Windows).'
+          echo 'Reproduce the whole run locally with scripts/check_profile.sh.'
           exit 1

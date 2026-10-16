@@ -4070,7 +4070,7 @@ void SelectMachineDialog::on_rename_enter()
     }
 
     if (m_valid_type == Valid && new_file_name.size()  >= 100) {
-        info_line = _L("The name length exceeds the limit.");
+        info_line = _L("The file name is too long for the printer. Shorten it and try again.");
         m_valid_type = NoValid;
     }
 

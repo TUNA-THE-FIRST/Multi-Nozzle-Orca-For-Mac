@@ -1013,6 +1013,13 @@ private:
     bool            on_init_network(bool try_backup = false);
     void            init_networking_callbacks();
     void            init_app_config();
+    // The settings init_app_config() takes from the loaded preferences (again after an import).
+    void            apply_app_config_settings();
+#ifdef __APPLE__
+    // First launch of Snapmaker Orca Mac: offer to copy official Snapmaker Orca's settings.
+    void            offer_settings_import();
+    std::string     m_settings_import_source;
+#endif
     // GUI-side subscriptions to plugin loader events (dialog refresh,
     // network-agent registration, plate revalidation).
     void            init_plugin_gui_wiring();

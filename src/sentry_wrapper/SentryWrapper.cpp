@@ -7,6 +7,7 @@
  */
 
 #include "SentryWrapper.hpp"
+#include "libslic3r_version.h"
 
 #ifdef SLIC3R_SENTRY
 #include "sentry.h"
@@ -110,7 +111,7 @@ void initSentryEx()
         const char* home_env = getenv("HOME");
 
         dataBaseDir = home_env;
-        dataBaseDir = dataBaseDir + "/Library/Application Support/Snapmaker_Orca/SentryData";
+        dataBaseDir = dataBaseDir + "/Library/Application Support/" SLIC3R_DATA_DIR_NAME "/SentryData";
 #elif _WIN32
         // Use extended path length support for Windows (up to 32767 characters)
         const DWORD MAX_PATH_EXTENDED = 32767;
